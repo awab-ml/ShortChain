@@ -1,0 +1,66 @@
+# TabAgent Default Configuration
+# ================================
+# Override any setting via CLI flags or by creating a custom YAML config.
+
+ingest:
+  format: "jsonl"                     # json | jsonl
+  success_only: true                  # filter to successful trajectories
+  field_map:                          # map your log fields to TabAgent schema
+    task_id: "task_id"
+    intent: "intent"
+    steps: "steps"
+    success: "success"
+    agent_name: "agent_name"
+    action: "action"
+    observation: "observation"
+    thoughts: "thoughts"
+
+dataset:
+  negative_ratio: 3                   # negatives per positive sample
+  negative_strategy: "random"         # random | hard | mixed
+  context_fields:
+    - "intent"
+    - "app_name"
+    - "n_steps"
+    - "previous_tools"
+    - "last_thought"
+  text_encoder: "tfidf"              # tfidf | e5-small
+  tfidf_max_features: 5000
+
+splitter:
+  n_folds: 5
+  test_size: 0.2
+  group_by: "task_id"
+  stratify_by:
+    - "app_name"
+
+classifier:
+  model_type: "xgboost"              # xgboost | random_forest | logistic
+  xgboost:
+    n_estimators: 300
+    max_depth: 8
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_weight: 3
+    eval_metric: "logloss"
+    early_stopping_rounds: 20
+  random_forest:
+    n_estimators: 200
+    max_depth: 12
+    min_samples_leaf: 5
+  logistic:
+    C: 1.0
+    max_iter: 1000
+
+inference:
+  top_k: 7                           # default shortlist size
+  confidence_threshold: 0.5          # for multi-label thresholding
+
+evaluation:
+  k_values: [3, 5, 7, 9]
+  metrics:
+    - "r_precision"
+    - "recall_at_k"
+    - "accuracy"
+    - "f1"

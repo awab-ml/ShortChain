@@ -1,0 +1,12 @@
+{
+  "accuracy": 0.75,
+  "precision": 0.0,
+  "recall": 0.0,
+  "f1": 0.0,
+  "auc": 0.5,
+  "r_precision": 0.0,
+  "recall_at_3": 0.0,
+  "recall_at_5": 0.0,
+  "recall_at_7": 0.3333333333333333,
+  "recall_at_9": 0.6666666666666666
+}

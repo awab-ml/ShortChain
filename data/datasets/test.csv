@@ -1,0 +1,29 @@
+task_id,intent,app_name,n_steps,previous_tools,last_thought,tool_name,tool_description,label
+task_001,Send an email to John about the meeting tomorrow at 3pm,gmail,4,search_contacts | create_draft | send_email,Sending the drafted email,search_contacts,,1
+task_001,Send an email to John about the meeting tomorrow at 3pm,gmail,4,search_contacts | create_draft | send_email,Sending the drafted email,send_email,,1
+task_001,Send an email to John about the meeting tomorrow at 3pm,gmail,4,search_contacts | create_draft | send_email,Sending the drafted email,create_draft,,1
+task_001,Send an email to John about the meeting tomorrow at 3pm,gmail,4,search_contacts | create_draft | send_email,Sending the drafted email,search_tracks,,0
+task_001,Send an email to John about the meeting tomorrow at 3pm,gmail,4,search_contacts | create_draft | send_email,Sending the drafted email,add_to_wishlist,,0
+task_001,Send an email to John about the meeting tomorrow at 3pm,gmail,4,search_contacts | create_draft | send_email,Sending the drafted email,get_contact_group,,0
+task_001,Send an email to John about the meeting tomorrow at 3pm,gmail,4,search_contacts | create_draft | send_email,Sending the drafted email,update_note,,0
+task_001,Send an email to John about the meeting tomorrow at 3pm,gmail,4,search_contacts | create_draft | send_email,Sending the drafted email,set_reminder,,0
+task_001,Send an email to John about the meeting tomorrow at 3pm,gmail,4,search_contacts | create_draft | send_email,Sending the drafted email,list_notebooks,,0
+task_001,Send an email to John about the meeting tomorrow at 3pm,gmail,4,search_contacts | create_draft | send_email,Sending the drafted email,reply_to_email,,0
+task_001,Send an email to John about the meeting tomorrow at 3pm,gmail,4,search_contacts | create_draft | send_email,Sending the drafted email,search_emails,,0
+task_001,Send an email to John about the meeting tomorrow at 3pm,gmail,4,search_contacts | create_draft | send_email,Sending the drafted email,search_products,,0
+task_010,Send a text message to the family group chat about the weekend barbecue,phone,3,get_contact_group | send_message,Composing and sending group message,send_message,,1
+task_010,Send a text message to the family group chat about the weekend barbecue,phone,3,get_contact_group | send_message,Composing and sending group message,get_contact_group,,1
+task_010,Send a text message to the family group chat about the weekend barbecue,phone,3,get_contact_group | send_message,Composing and sending group message,set_reminder,,0
+task_010,Send a text message to the family group chat about the weekend barbecue,phone,3,get_contact_group | send_message,Composing and sending group message,search_contacts,,0
+task_010,Send a text message to the family group chat about the weekend barbecue,phone,3,get_contact_group | send_message,Composing and sending group message,update_note,,0
+task_010,Send a text message to the family group chat about the weekend barbecue,phone,3,get_contact_group | send_message,Composing and sending group message,forward_email,,0
+task_010,Send a text message to the family group chat about the weekend barbecue,phone,3,get_contact_group | send_message,Composing and sending group message,add_tracks_to_playlist,,0
+task_010,Send a text message to the family group chat about the weekend barbecue,phone,3,get_contact_group | send_message,Composing and sending group message,search_products,,0
+task_012,Find and save a recipe for chocolate cake in my notes,simplenote,3,search_web | create_note,Saving the best recipe to notes,create_note,,1
+task_012,Find and save a recipe for chocolate cake in my notes,simplenote,3,search_web | create_note,Saving the best recipe to notes,search_web,,1
+task_012,Find and save a recipe for chocolate cake in my notes,simplenote,3,search_web | create_note,Saving the best recipe to notes,get_contact_group,,0
+task_012,Find and save a recipe for chocolate cake in my notes,simplenote,3,search_web | create_note,Saving the best recipe to notes,get_email,,0
+task_012,Find and save a recipe for chocolate cake in my notes,simplenote,3,search_web | create_note,Saving the best recipe to notes,list_notebooks,,0
+task_012,Find and save a recipe for chocolate cake in my notes,simplenote,3,search_web | create_note,Saving the best recipe to notes,get_product_details,,0
+task_012,Find and save a recipe for chocolate cake in my notes,simplenote,3,search_web | create_note,Saving the best recipe to notes,search_products,,0
+task_012,Find and save a recipe for chocolate cake in my notes,simplenote,3,search_web | create_note,Saving the best recipe to notes,update_note,,0
