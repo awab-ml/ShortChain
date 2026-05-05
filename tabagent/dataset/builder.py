@@ -3,6 +3,12 @@
 Implements the **pointwise reduction** strategy from the TabAgent paper:
 for each trajectory, create positive pairs for tools actually used and
 negative pairs for sampled tools from the catalog that were *not* used.
+
+Phase 2 upgrades:
+- Uses ``ContextFeatureBuilder`` for richer, state-aware context features.
+- Uses ``ToolFeatureBuilder`` for corpus-enriched tool features.
+- Delegates negative sampling to pluggable ``NegativeSampler`` strategies.
+- Precomputes ``CorpusStats`` from the training trajectories.
 """
 
 from __future__ import annotations
@@ -14,7 +20,11 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from tabagent.config import DatasetConfig
+from tabagent.config import DatasetConfig, FeaturesConfig, NegativeSamplingConfig
+from tabagent.dataset.negatives import NegativeSampler, create_sampler
+from tabagent.features.context import ContextFeatureBuilder
+from tabagent.features.stats import CorpusStats
+from tabagent.features.tool import ToolFeatureBuilder
 from tabagent.ingest.schema import Trajectory
 from tabagent.utils.logging import get_logger
 
@@ -28,6 +38,10 @@ class DatasetBuilder:
     ----------
     config
         Dataset construction settings.
+    features_config
+        Feature pipeline settings (controls state / dependency features).
+    negatives_config
+        Negative sampling strategy settings.
     tool_catalog
         Optional explicit tool catalog ``{tool_name: description}``.
         If ``None``, the catalog is derived from all tools seen in the
@@ -37,10 +51,15 @@ class DatasetBuilder:
     def __init__(
         self,
         config: DatasetConfig | None = None,
+        features_config: FeaturesConfig | None = None,
+        negatives_config: NegativeSamplingConfig | None = None,
         tool_catalog: dict[str, str] | None = None,
     ) -> None:
         self.config = config or DatasetConfig()
+        self.features_config = features_config or FeaturesConfig()
+        self.negatives_config = negatives_config or NegativeSamplingConfig()
         self._explicit_catalog = tool_catalog
+        self._corpus_stats: CorpusStats | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -52,15 +71,34 @@ class DatasetBuilder:
         Returns
         -------
         pd.DataFrame
-            Columns: ``task_id, intent, app_name, n_steps, previous_tools,
-            last_thought, tool_name, tool_description, label``
+            Columns include context features, tool features, and ``label``.
         """
         catalog = self._resolve_catalog(trajectories)
         log.info(f"Tool catalog size: [bold]{len(catalog)}[/bold]")
 
+        # Compute corpus stats for feature builders and samplers
+        self._corpus_stats = CorpusStats.from_trajectories(trajectories)
+
+        # Initialise feature builders
+        context_builder = ContextFeatureBuilder(
+            corpus_stats=self._corpus_stats,
+            include_state=self.features_config.include_state_features,
+            include_dependencies=self.features_config.include_dependency_features,
+        )
+        tool_builder = ToolFeatureBuilder(corpus_stats=self._corpus_stats)
+
+        # Initialise negative sampler
+        sampler = create_sampler(
+            config=self.negatives_config,
+            catalog=catalog,
+            corpus_stats=self._corpus_stats,
+        )
+
         rows: list[dict[str, Any]] = []
         for traj in trajectories:
-            rows.extend(self._build_pairs(traj, catalog))
+            rows.extend(
+                self._build_pairs(traj, catalog, context_builder, tool_builder, sampler)
+            )
 
         df = pd.DataFrame(rows)
         pos = int(df["label"].sum())
@@ -70,6 +108,11 @@ class DatasetBuilder:
             f"({pos} positive, {neg} negative, ratio ≈ {neg / max(pos, 1):.1f}:1)"
         )
         return df
+
+    @property
+    def corpus_stats(self) -> CorpusStats | None:
+        """Access the computed corpus statistics (available after ``build()``)."""
+        return self._corpus_stats
 
     # ------------------------------------------------------------------
     # Internals
@@ -99,51 +142,41 @@ class DatasetBuilder:
         self,
         traj: Trajectory,
         catalog: dict[str, str],
+        context_builder: ContextFeatureBuilder,
+        tool_builder: ToolFeatureBuilder,
+        sampler: NegativeSampler,
     ) -> list[dict[str, Any]]:
         """Create positive + negative (context, tool, label) rows for one trajectory."""
-        context = self._extract_context(traj)
+        context = context_builder.build(traj, step_index=None)
         rows: list[dict[str, Any]] = []
 
         # Positive pairs: tools actually used
         for tool_name in traj.tools_used:
-            row = {
-                **context,
-                "tool_name": tool_name,
-                "tool_description": catalog.get(tool_name, ""),
-                "label": 1,
-            }
+            tool_features = tool_builder.build(
+                tool_name,
+                tool_meta={"description": catalog.get(tool_name, "")},
+                context=context,
+            )
+            row = {**context, **tool_features, "label": 1}
             rows.append(row)
 
-        # Negative pairs: tools NOT used
-        negative_pool = [t for t in catalog if t not in traj.tools_used]
-        n_negatives = min(
-            len(negative_pool),
-            len(traj.tools_used) * self.config.negative_ratio,
+        # Negative pairs via sampler
+        n_negatives = len(traj.tools_used) * self.config.negative_ratio
+        negative_tools = sampler.sample(
+            positive_tools=traj.tools_used,
+            app_name=traj.app_name,
+            n=n_negatives,
         )
-
-        if negative_pool and n_negatives > 0:
-            sampled_negatives = random.sample(negative_pool, n_negatives)
-            for tool_name in sampled_negatives:
-                row = {
-                    **context,
-                    "tool_name": tool_name,
-                    "tool_description": catalog.get(tool_name, ""),
-                    "label": 0,
-                }
-                rows.append(row)
+        for tool_name in negative_tools:
+            tool_features = tool_builder.build(
+                tool_name,
+                tool_meta={"description": catalog.get(tool_name, "")},
+                context=context,
+            )
+            row = {**context, **tool_features, "label": 0}
+            rows.append(row)
 
         return rows
-
-    def _extract_context(self, traj: Trajectory) -> dict[str, Any]:
-        """Extract context features from a trajectory."""
-        return {
-            "task_id": traj.task_id,
-            "intent": traj.intent,
-            "app_name": traj.app_name,
-            "n_steps": traj.n_steps,
-            "previous_tools": " | ".join(traj.tool_sequence),
-            "last_thought": traj.last_thought or "",
-        }
 
 
 # ---------------------------------------------------------------------------
@@ -153,8 +186,15 @@ class DatasetBuilder:
 def build_dataset(
     trajectories: list[Trajectory],
     config: DatasetConfig | None = None,
+    features_config: FeaturesConfig | None = None,
+    negatives_config: NegativeSamplingConfig | None = None,
     tool_catalog: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Build a training dataset from trajectories (convenience wrapper)."""
-    builder = DatasetBuilder(config=config, tool_catalog=tool_catalog)
+    builder = DatasetBuilder(
+        config=config,
+        features_config=features_config,
+        negatives_config=negatives_config,
+        tool_catalog=tool_catalog,
+    )
     return builder.build(trajectories)
