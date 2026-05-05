@@ -38,10 +38,41 @@ class IngestConfig(BaseModel):
     field_map: FieldMapConfig = Field(default_factory=FieldMapConfig)
 
 
+class FeaturesConfig(BaseModel):
+    """Feature pipeline settings."""
+
+    text_encoder: str = "tfidf"                     # tfidf | e5-small | auto
+    e5_model_name: str = "intfloat/e5-small-v2"
+    tfidf_max_features: int = 5000
+    context_fields: list[str] = Field(
+        default_factory=lambda: [
+            "intent",
+            "app_name",
+            "n_steps",
+            "previous_tools",
+            "last_thought",
+        ]
+    )
+    include_state_features: bool = True
+    include_dependency_features: bool = True
+
+
+class NegativeSamplingConfig(BaseModel):
+    """Negative sampling strategy settings."""
+
+    strategy: str = "random"                        # random | hard | mixed
+    hard_negative_ratio: float = 0.5                # fraction of hard negs in mixed
+    same_app_weight: float = 0.4
+    co_usage_weight: float = 0.3
+    similarity_weight: float = 0.3
+    random_state: int | None = None                 # seed for reproducibility
+
+
 class DatasetConfig(BaseModel):
     """Dataset construction settings."""
 
     negative_ratio: int = 3
+    # --- Kept for backward compatibility; prefer FeaturesConfig/NegativeSamplingConfig ---
     negative_strategy: str = "random"
     context_fields: list[str] = Field(
         default_factory=lambda: [
@@ -131,6 +162,8 @@ class TabAgentConfig(BaseModel):
     """Root configuration for the TabAgent pipeline."""
 
     ingest: IngestConfig = Field(default_factory=IngestConfig)
+    features: FeaturesConfig = Field(default_factory=FeaturesConfig)
+    negatives: NegativeSamplingConfig = Field(default_factory=NegativeSamplingConfig)
     dataset: DatasetConfig = Field(default_factory=DatasetConfig)
     splitter: SplitterConfig = Field(default_factory=SplitterConfig)
     classifier: ClassifierConfig = Field(default_factory=ClassifierConfig)

@@ -15,16 +15,37 @@ ingest:
     observation: "observation"
     thoughts: "thoughts"
 
-dataset:
-  negative_ratio: 3                   # negatives per positive sample
-  negative_strategy: "random"         # random | hard | mixed
+features:
+  text_encoder: "tfidf"              # tfidf | e5-small | auto
+  e5_model_name: "intfloat/e5-small-v2"
+  tfidf_max_features: 5000
   context_fields:
     - "intent"
     - "app_name"
     - "n_steps"
     - "previous_tools"
     - "last_thought"
-  text_encoder: "tfidf"              # tfidf | e5-small
+  include_state_features: true        # step_index, last_action, etc.
+  include_dependency_features: true   # tool_diversity, app_tool_count, etc.
+
+negatives:
+  strategy: "random"                  # random | hard | mixed
+  hard_negative_ratio: 0.5           # fraction of hard negs in mixed mode
+  same_app_weight: 0.4               # weight for same-app hard negatives
+  co_usage_weight: 0.3               # weight for co-usage hard negatives
+  similarity_weight: 0.3             # weight for description-similar negatives
+  # random_state: 42                 # uncomment for reproducible sampling
+
+dataset:
+  negative_ratio: 3                   # negatives per positive sample
+  negative_strategy: "random"         # (legacy — prefer negatives.strategy)
+  context_fields:
+    - "intent"
+    - "app_name"
+    - "n_steps"
+    - "previous_tools"
+    - "last_thought"
+  text_encoder: "tfidf"              # (legacy — prefer features.text_encoder)
   tfidf_max_features: 5000
 
 splitter:
