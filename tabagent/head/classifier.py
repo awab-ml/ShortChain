@@ -1,10 +1,10 @@
 """Unified classifier interface wrapping multiple backends.
 
 Phase 1 backends: XGBoost (default), RandomForest, LogisticRegression.
-Text features are encoded via TF-IDF (or optionally sentence-transformer
-embeddings).  The classifier operates on the pointwise-reduced dataset
-where each row is a ``(context, candidate_tool)`` pair with a binary
-label.
+
+Phase 2: Feature encoding is delegated to ``FeaturePipeline``.
+Legacy models (pickled without a pipeline) are supported via a
+compatibility adapter that falls back to inline encoding.
 """
 
 from __future__ import annotations
@@ -19,17 +19,11 @@ from scipy.sparse import issparse, hstack as sp_hstack
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import LabelEncoder
 
-from tabagent.config import ClassifierConfig
+from tabagent.config import ClassifierConfig, FeaturesConfig
+from tabagent.features.pipeline import FeaturePipeline
 from tabagent.utils.logging import get_logger
 
 log = get_logger(__name__)
-
-# Text columns that get TF-IDF encoded
-_TEXT_COLS = ["intent", "previous_tools", "last_thought", "tool_name", "tool_description"]
-# Numeric columns passed through directly
-_NUM_COLS = ["n_steps"]
-# Categorical columns that get label-encoded
-_CAT_COLS = ["app_name"]
 
 
 class TabAgentClassifier:
@@ -39,15 +33,27 @@ class TabAgentClassifier:
     ----------
     config
         Classifier configuration (model type + hyper-parameters).
+    features_config
+        Feature pipeline configuration.  If provided, a
+        ``FeaturePipeline`` is used for encoding.
     """
 
-    def __init__(self, config: ClassifierConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: ClassifierConfig | None = None,
+        features_config: FeaturesConfig | None = None,
+    ) -> None:
         self.config = config or ClassifierConfig()
+        self.features_config = features_config
         self.model: Any = None
-        self.tfidf_vectorizers: dict[str, TfidfVectorizer] = {}
-        self.label_encoders: dict[str, LabelEncoder] = {}
-        self._skipped_text_cols: set[str] = set()
+        self.pipeline: FeaturePipeline | None = None
         self._is_fitted = False
+
+        # Legacy encoding state (used only for backward-compat loading)
+        self._legacy_tfidf: dict[str, TfidfVectorizer] = {}
+        self._legacy_le: dict[str, LabelEncoder] = {}
+        self._legacy_skipped: set[str] = set()
+        self._use_legacy = False
 
     # ------------------------------------------------------------------
     # Public API
@@ -68,7 +74,12 @@ class TabAgentClassifier:
         self
         """
         self.model = self._create_model()
-        X_enc = self._fit_transform(X)
+
+        # Use FeaturePipeline for encoding
+        self.pipeline = FeaturePipeline(
+            config=self.features_config or FeaturesConfig()
+        )
+        X_enc = self.pipeline.fit_transform(X)
 
         log.info(
             f"Training [bold]{self.config.model_type}[/bold] on "
@@ -76,6 +87,7 @@ class TabAgentClassifier:
         )
         self.model.fit(X_enc, y)
         self._is_fitted = True
+        self._use_legacy = False
         return self
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
@@ -92,7 +104,7 @@ class TabAgentClassifier:
             Shape ``(n_samples,)`` — probability of ``label=1``.
         """
         self._check_fitted()
-        X_enc = self._transform(X)
+        X_enc = self._encode(X)
         proba = self.model.predict_proba(X_enc)
         # Some models return (n, 2), take positive-class column
         if proba.ndim == 2:
@@ -102,7 +114,7 @@ class TabAgentClassifier:
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         """Return binary predictions."""
         self._check_fitted()
-        X_enc = self._transform(X)
+        X_enc = self._encode(X)
         return self.model.predict(X_enc)
 
     def shortlist(
@@ -142,16 +154,18 @@ class TabAgentClassifier:
         return results
 
     def save(self, path: str | Path) -> Path:
-        """Persist the trained model and feature encoders."""
+        """Persist the trained model and feature pipeline."""
         self._check_fitted()
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         state = {
             "model": self.model,
             "config": self.config.model_dump(),
-            "tfidf_vectorizers": self.tfidf_vectorizers,
-            "label_encoders": self.label_encoders,
-            "skipped_text_cols": self._skipped_text_cols,
+            "features_config": (
+                self.features_config.model_dump() if self.features_config else None
+            ),
+            "pipeline": self.pipeline,
+            "version": 2,  # Phase 2 format marker
         }
         with open(path, "wb") as f:
             pickle.dump(state, f)
@@ -160,107 +174,91 @@ class TabAgentClassifier:
 
     @classmethod
     def load(cls, path: str | Path) -> "TabAgentClassifier":
-        """Load a trained classifier from disk."""
+        """Load a trained classifier from disk.
+
+        Supports both Phase 1 (legacy) and Phase 2 model formats.
+        """
         with open(path, "rb") as f:
             state = pickle.load(f)
+
         config = ClassifierConfig.model_validate(state["config"])
-        obj = cls(config=config)
-        obj.model = state["model"]
-        obj.tfidf_vectorizers = state["tfidf_vectorizers"]
-        obj.label_encoders = state["label_encoders"]
-        obj._skipped_text_cols = state.get("skipped_text_cols", set())
-        obj._is_fitted = True
-        log.info(f"Model loaded from {path}")
+        version = state.get("version", 1)
+
+        if version >= 2:
+            # Phase 2 format
+            features_config = (
+                FeaturesConfig.model_validate(state["features_config"])
+                if state.get("features_config")
+                else None
+            )
+            obj = cls(config=config, features_config=features_config)
+            obj.model = state["model"]
+            obj.pipeline = state["pipeline"]
+            obj._is_fitted = True
+            obj._use_legacy = False
+            log.info(f"Model loaded from {path} (v2 format)")
+        else:
+            # Phase 1 legacy format — use compatibility adapter
+            obj = cls(config=config)
+            obj.model = state["model"]
+            obj._legacy_tfidf = state.get("tfidf_vectorizers", {})
+            obj._legacy_le = state.get("label_encoders", {})
+            obj._legacy_skipped = state.get("skipped_text_cols", set())
+            obj._is_fitted = True
+            obj._use_legacy = True
+            log.info(f"Model loaded from {path} (v1 legacy format)")
+
         return obj
 
     # ------------------------------------------------------------------
-    # Feature encoding
+    # Encoding (dispatch)
     # ------------------------------------------------------------------
 
-    def _fit_transform(self, X: pd.DataFrame) -> np.ndarray:
-        """Fit encoders on training data and return encoded features."""
+    def _encode(self, X: pd.DataFrame) -> np.ndarray:
+        """Encode features using either the pipeline or legacy path."""
+        if self._use_legacy:
+            return self._legacy_transform(X)
+        if self.pipeline is None:
+            raise RuntimeError("No FeaturePipeline available")
+        return self.pipeline.transform(X)
+
+    # ------------------------------------------------------------------
+    # Legacy compatibility adapter
+    # ------------------------------------------------------------------
+
+    # Text columns used in Phase 1
+    _LEGACY_TEXT = ["intent", "previous_tools", "last_thought", "tool_name", "tool_description"]
+    _LEGACY_NUM = ["n_steps"]
+    _LEGACY_CAT = ["app_name"]
+
+    def _legacy_transform(self, X: pd.DataFrame) -> np.ndarray:
+        """Transform using Phase 1 inline encoders (backward compat)."""
         parts = []
 
-        # TF-IDF for text columns
-        for col in _TEXT_COLS:
-            if col in X.columns:
-                vec = TfidfVectorizer(
-                    max_features=5000,
-                    sublinear_tf=True,
-                    dtype=np.float32,
-                )
-                try:
-                    encoded = vec.fit_transform(X[col].fillna("").astype(str))
-                    self.tfidf_vectorizers[col] = vec
-                    parts.append(encoded)
-                except ValueError:
-                    # Column contains only empty strings or stop words — skip it
-                    log.debug(f"Skipping TF-IDF for column '{col}' (empty vocabulary)")
-                    self._skipped_text_cols.add(col)
-
-        # Label encoding for categoricals
-        for col in _CAT_COLS:
-            if col in X.columns:
-                le = LabelEncoder()
-                vals = X[col].fillna("__unknown__").astype(str)
-                encoded = le.fit_transform(vals).reshape(-1, 1).astype(np.float32)
-                self.label_encoders[col] = le
-                parts.append(encoded)
-
-        # Numeric columns
-        for col in _NUM_COLS:
-            if col in X.columns:
-                vals = X[col].fillna(0).values.reshape(-1, 1).astype(np.float32)
-                parts.append(vals)
-
-        return self._concat_features(parts)
-
-    def _transform(self, X: pd.DataFrame) -> np.ndarray:
-        """Transform new data using fitted encoders."""
-        parts = []
-
-        for col in _TEXT_COLS:
-            if col in self.tfidf_vectorizers:
-                vec = self.tfidf_vectorizers[col]
+        for col in self._LEGACY_TEXT:
+            if col in self._legacy_tfidf:
+                vec = self._legacy_tfidf[col]
                 encoded = vec.transform(X[col].fillna("").astype(str))
-                parts.append(encoded)
+                parts.append(encoded.toarray())
 
-        for col in _CAT_COLS:
-            if col in self.label_encoders:
-                le = self.label_encoders[col]
+        for col in self._LEGACY_CAT:
+            if col in self._legacy_le:
+                le = self._legacy_le[col]
                 vals = X[col].fillna("__unknown__").astype(str)
-                # Handle unseen labels gracefully
                 encoded = np.array(
                     [le.transform([v])[0] if v in le.classes_ else -1 for v in vals],
                     dtype=np.float32,
                 ).reshape(-1, 1)
                 parts.append(encoded)
 
-        for col in _NUM_COLS:
+        for col in self._LEGACY_NUM:
             if col in X.columns:
                 vals = X[col].fillna(0).values.reshape(-1, 1).astype(np.float32)
                 parts.append(vals)
 
-        return self._concat_features(parts)
-
-    @staticmethod
-    def _concat_features(parts: list) -> np.ndarray:
-        """Concatenate sparse and dense feature matrices."""
         if not parts:
-            raise ValueError("No features to concatenate — check column names")
-
-        # Separate sparse and dense
-        sparse_parts = [p for p in parts if issparse(p)]
-        dense_parts = [p for p in parts if not issparse(p)]
-
-        if sparse_parts:
-            sparse_combined = sp_hstack(sparse_parts)
-            if dense_parts:
-                dense_combined = np.hstack(dense_parts)
-                # Convert sparse to dense for final concatenation
-                return np.hstack([sparse_combined.toarray(), dense_combined])
-            return sparse_combined.toarray()
-        return np.hstack(dense_parts)
+            raise ValueError("No features to encode")
+        return np.hstack(parts)
 
     # ------------------------------------------------------------------
     # Model factory
