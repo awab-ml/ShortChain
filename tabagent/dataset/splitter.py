@@ -1,7 +1,8 @@
-"""Group-aware stratified splitting.
+"""Group-aware splitting.
 
-Ensures all rows from one task stay in the same fold (no leakage) and
-stratifies by application name and tool count deciles.
+Currently preserves task boundaries to prevent leakage.
+Future versions may add ***stratification*** by metadata such as app name
+or tool-count buckets.
 """
 
 from __future__ import annotations
