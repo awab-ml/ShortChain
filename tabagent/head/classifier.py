@@ -81,11 +81,21 @@ class TabAgentClassifier:
         )
         X_enc = self.pipeline.fit_transform(X)
 
+        # Early stopping for XGBoost: hold out 10% for eval_set
+        fit_kwargs: dict = {}
+        if self.config.model_type == "xgboost" and self.config.xgboost.early_stopping_rounds:
+            from sklearn.model_selection import train_test_split
+
+            X_enc, X_val, y, y_val = train_test_split(
+                X_enc, y, test_size=0.1, random_state=42,
+            )
+            fit_kwargs["eval_set"] = [(X_val, y_val)]
+
         log.info(
             f"Training [bold]{self.config.model_type}[/bold] on "
             f"{X_enc.shape[0]} samples × {X_enc.shape[1]} features"
         )
-        self.model.fit(X_enc, y)
+        self.model.fit(X_enc, y, **fit_kwargs)
         self._is_fitted = True
         self._use_legacy = False
         return self
@@ -272,7 +282,6 @@ class TabAgentClassifier:
             from xgboost import XGBClassifier
 
             params = self.config.xgboost.model_dump()
-            early_stopping = params.pop("early_stopping_rounds", None)
             return XGBClassifier(
                 **params,
                 use_label_encoder=False,
