@@ -1,7 +1,13 @@
 """Group-aware splitting.
 
-Currently preserves task boundaries to prevent leakage.
-Future versions may add ***stratification*** by metadata such as app name
+Preserves task boundaries so all rows from the same task remain in the
+same split or fold, preventing data leakage.
+
+Note:
+    The class name is retained for backward compatibility. Current
+    implementation does not yet perform stratified splitting.
+
+Future versions may add stratification using metadata such as app name
 or tool-count buckets.
 """
 
