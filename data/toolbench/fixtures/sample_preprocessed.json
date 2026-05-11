@@ -1,0 +1,151 @@
+[
+  {
+    "id": "G1_fixture_001: Check the current weather in London and provide a forecast",
+    "conversations": [
+      {
+        "from": "system",
+        "value": "You are AutoGPT, you can use many tools(functions) to do the following task.\nFirst I will give you the task description, and your task start.\nAt each step, you need to give your thought to analyze the status now and what to do next, with a function call to actually excute your step. Your output should follow this format:\nThought:\nAction\nAction Input:\n\nAfter the call, you will get the call result, and you are now in a new state.\nThen you will analyze your status now, then decide what to do next...\nAfter many (Thought-call) pairs, you finally perform the task, then you can give your finial answer.\nRemember: \n1.the state change is irreversible, you can't go back to one of the former state, if you want to restart the task, say \"I give up and restart\".\n2.All the thought is short, at most in 5 sentence.\n3.You can do more then one trys, so if your plan is to continusly try some conditions, you can do one of the conditions per try.\nLet's Begin!\nTask description: You should use functions to help handle the real time user querys. Remember:\n1.ALWAYS call \"Finish\" function at the end of the task. And the final answer should contain enough information to show to the user,If you can't handle the task, or you find that function calls always fail(the function is not valid now), use function Finish->give_up_and_restart.\n2.Do not use origin tool names, use only subfunctions' names.\nYou have access of the following tools:\n1.open_weather: Provides current weather data and forecasts for any location worldwide.\n\nSpecifically, you have access to the following APIs: [{'name': 'get_current_weather_for_open_weather', 'description': 'This is the subfunction for tool \"open_weather\", you can use this tool.The description of this function is: \"Get current weather conditions for a specified location\"', 'parameters': {'type': 'object', 'properties': {'location': {'type': 'string', 'description': 'City name or coordinates'}}, 'required': ['location'], 'optional': []}}, {'name': 'get_forecast_for_open_weather', 'description': 'This is the subfunction for tool \"open_weather\", you can use this tool.The description of this function is: \"Get 5-day weather forecast for a specified location\"', 'parameters': {'type': 'object', 'properties': {'location': {'type': 'string', 'description': 'City name or coordinates'}}, 'required': ['location'], 'optional': []}}, {'name': 'Finish', 'description': 'If you believe that you have obtained a result that can answer the task, please call this function to provide the final answer. Alternatively, if you recognize that you are unable to proceed with the task in the current state, call this function to restart. Remember: you must ALWAYS call this function at the end of your attempt, and the only part that will be shown to the user is the final answer, so it should contain sufficient information.', 'parameters': {'type': 'object', 'properties': {'return_type': {'type': 'string', 'enum': ['give_answer', 'give_up_and_restart']}, 'final_answer': {'type': 'string', 'description': 'The final answer you want to give the user. You should have this field if \"return_type\"==\"give_answer\"'}}, 'required': ['return_type']}}]"
+      },
+      {
+        "from": "user",
+        "value": "\nCheck the current weather in London and provide a 5-day forecast.\nBegin!\n"
+      },
+      {
+        "from": "assistant",
+        "value": "\nThought: I need to get the current weather in London first.\nAction: get_current_weather_for_open_weather\nAction Input: {\n  \"location\": \"London\"\n}\n"
+      },
+      {
+        "from": "function",
+        "value": "{\"error\": \"\", \"response\": {\"temperature\": \"15C\", \"humidity\": \"72%\", \"condition\": \"Partly Cloudy\"}}"
+      },
+      {
+        "from": "assistant",
+        "value": "\nThought: Now I need to get the 5-day forecast for London.\nAction: get_forecast_for_open_weather\nAction Input: {\n  \"location\": \"London\"\n}\n"
+      },
+      {
+        "from": "function",
+        "value": "{\"error\": \"\", \"response\": {\"forecast\": [{\"day\": \"Mon\", \"temp\": \"16C\"}, {\"day\": \"Tue\", \"temp\": \"14C\"}, {\"day\": \"Wed\", \"temp\": \"18C\"}]}}"
+      },
+      {
+        "from": "assistant",
+        "value": "\nThought: I have both the current weather and forecast data for London. I can now provide the final answer.\nAction: Finish\nAction Input: {\n  \"return_type\": \"give_answer\",\n  \"final_answer\": \"The current weather in London is 15C and Partly Cloudy with 72% humidity. The forecast shows Mon: 16C, Tue: 14C, Wed: 18C.\"\n}\n"
+      }
+    ]
+  },
+  {
+    "id": "G1_fixture_002: Get the stock price for Apple Inc",
+    "conversations": [
+      {
+        "from": "system",
+        "value": "You are AutoGPT, you can use many tools(functions) to do the following task.\nFirst I will give you the task description, and your task start.\nAt each step, you need to give your thought to analyze the status now and what to do next, with a function call to actually excute your step. Your output should follow this format:\nThought:\nAction\nAction Input:\n\nAfter the call, you will get the call result, and you are now in a new state.\nThen you will analyze your status now, then decide what to do next...\nAfter many (Thought-call) pairs, you finally perform the task, then you can give your finial answer.\nRemember: \n1.the state change is irreversible, you can't go back to one of the former state, if you want to restart the task, say \"I give up and restart\".\n2.All the thought is short, at most in 5 sentence.\n3.You can do more then one trys, so if your plan is to continusly try some conditions, you can do one of the conditions per try.\nLet's Begin!\nTask description: You should use functions to help handle the real time user querys. Remember:\n1.ALWAYS call \"Finish\" function at the end of the task. And the final answer should contain enough information to show to the user,If you can't handle the task, or you find that function calls always fail(the function is not valid now), use function Finish->give_up_and_restart.\n2.Do not use origin tool names, use only subfunctions' names.\nYou have access of the following tools:\n1.stock_tracker: Real-time stock market data and historical prices for global exchanges.\n\nSpecifically, you have access to the following APIs: [{'name': 'get_stock_price_for_stock_tracker', 'description': 'This is the subfunction for tool \"stock_tracker\", you can use this tool.The description of this function is: \"Get current stock price for a given ticker symbol\"', 'parameters': {'type': 'object', 'properties': {'symbol': {'type': 'string', 'description': 'Stock ticker symbol'}}, 'required': ['symbol'], 'optional': []}}, {'name': 'get_historical_prices_for_stock_tracker', 'description': 'This is the subfunction for tool \"stock_tracker\", you can use this tool.The description of this function is: \"Get historical stock prices for a ticker over a date range\"', 'parameters': {'type': 'object', 'properties': {'symbol': {'type': 'string', 'description': 'Stock ticker symbol'}, 'start_date': {'type': 'string', 'description': 'Start date YYYY-MM-DD'}}, 'required': ['symbol', 'start_date'], 'optional': []}}, {'name': 'Finish', 'description': 'If you believe that you have obtained a result that can answer the task, please call this function to provide the final answer. Alternatively, if you recognize that you are unable to proceed with the task in the current state, call this function to restart. Remember: you must ALWAYS call this function at the end of your attempt, and the only part that will be shown to the user is the final answer, so it should contain sufficient information.', 'parameters': {'type': 'object', 'properties': {'return_type': {'type': 'string', 'enum': ['give_answer', 'give_up_and_restart']}, 'final_answer': {'type': 'string', 'description': 'The final answer you want to give the user. You should have this field if \"return_type\"==\"give_answer\"'}}, 'required': ['return_type']}}]"
+      },
+      {
+        "from": "user",
+        "value": "\nGet the current stock price for Apple Inc (AAPL) and show me the historical prices for the past month.\nBegin!\n"
+      },
+      {
+        "from": "assistant",
+        "value": "\nThought: I need to get the current stock price for AAPL first.\nAction: get_stock_price_for_stock_tracker\nAction Input: {\n  \"symbol\": \"AAPL\"\n}\n"
+      },
+      {
+        "from": "function",
+        "value": "{\"error\": \"\", \"response\": {\"symbol\": \"AAPL\", \"price\": 178.50, \"change\": \"+1.25\"}}"
+      },
+      {
+        "from": "assistant",
+        "value": "\nThought: Got the current price. Now I need historical prices for the past month.\nAction: get_historical_prices_for_stock_tracker\nAction Input: {\n  \"symbol\": \"AAPL\",\n  \"start_date\": \"2024-01-01\"\n}\n"
+      },
+      {
+        "from": "function",
+        "value": "{\"error\": \"\", \"response\": {\"prices\": [{\"date\": \"2024-01-01\", \"close\": 175.00}, {\"date\": \"2024-01-15\", \"close\": 177.25}]}}"
+      },
+      {
+        "from": "assistant",
+        "value": "\nThought: I have all the stock data. Time to provide the final answer.\nAction: Finish\nAction Input: {\n  \"return_type\": \"give_answer\",\n  \"final_answer\": \"Apple Inc (AAPL) current price is $178.50 (+$1.25). Historical: Jan 1: $175.00, Jan 15: $177.25.\"\n}\n"
+      }
+    ]
+  },
+  {
+    "id": "G1_fixture_003: Check live sports scores",
+    "conversations": [
+      {
+        "from": "system",
+        "value": "You are AutoGPT, you can use many tools(functions) to do the following task.\nFirst I will give you the task description, and your task start.\nAt each step, you need to give your thought to analyze the status now and what to do next, with a function call to actually excute your step. Your output should follow this format:\nThought:\nAction\nAction Input:\n\nAfter the call, you will get the call result, and you are now in a new state.\nThen you will analyze your status now, then decide what to do next...\nAfter many (Thought-call) pairs, you finally perform the task, then you can give your finial answer.\nRemember: \n1.the state change is irreversible, you can't go back to one of the former state, if you want to restart the task, say \"I give up and restart\".\n2.All the thought is short, at most in 5 sentence.\n3.You can do more then one trys, so if your plan is to continusly try some conditions, you can do one of the conditions per try.\nLet's Begin!\nTask description: You should use functions to help handle the real time user querys. Remember:\n1.ALWAYS call \"Finish\" function at the end of the task. And the final answer should contain enough information to show to the user,If you can't handle the task, or you find that function calls always fail(the function is not valid now), use function Finish->give_up_and_restart.\n2.Do not use origin tool names, use only subfunctions' names.\nYou have access of the following tools:\n1.live_scores: Live sports scores and match data for football, basketball, and cricket.\n\nSpecifically, you have access to the following APIs: [{'name': 'get_live_matches_for_live_scores', 'description': 'This is the subfunction for tool \"live_scores\", you can use this tool.The description of this function is: \"Get all currently live matches\"', 'parameters': {'type': 'object', 'properties': {}, 'required': [], 'optional': []}}, {'name': 'get_match_details_for_live_scores', 'description': 'This is the subfunction for tool \"live_scores\", you can use this tool.The description of this function is: \"Get detailed match information\"', 'parameters': {'type': 'object', 'properties': {'match_id': {'type': 'string', 'description': 'Match ID'}}, 'required': ['match_id'], 'optional': []}}, {'name': 'Finish', 'description': 'If you believe that you have obtained a result that can answer the task, please call this function to provide the final answer. Alternatively, if you recognize that you are unable to proceed with the task in the current state, call this function to restart. Remember: you must ALWAYS call this function at the end of your attempt, and the only part that will be shown to the user is the final answer, so it should contain sufficient information.', 'parameters': {'type': 'object', 'properties': {'return_type': {'type': 'string', 'enum': ['give_answer', 'give_up_and_restart']}, 'final_answer': {'type': 'string', 'description': 'The final answer you want to give the user. You should have this field if \"return_type\"==\"give_answer\"'}}, 'required': ['return_type']}}]"
+      },
+      {
+        "from": "user",
+        "value": "\nShow me all the live sports matches right now.\nBegin!\n"
+      },
+      {
+        "from": "assistant",
+        "value": "\nThought: I need to get all currently live matches.\nAction: get_live_matches_for_live_scores\nAction Input: {}\n"
+      },
+      {
+        "from": "function",
+        "value": "{\"error\": \"\", \"response\": {\"matches\": [{\"id\": \"m1\", \"sport\": \"football\", \"teams\": \"Arsenal vs Chelsea\", \"score\": \"2-1\"}]}}"
+      },
+      {
+        "from": "assistant",
+        "value": "\nThought: I found a live match. I can provide this information to the user.\nAction: Finish\nAction Input: {\n  \"return_type\": \"give_answer\",\n  \"final_answer\": \"There is 1 live match: Football - Arsenal vs Chelsea, Score: 2-1.\"\n}\n"
+      }
+    ]
+  },
+  {
+    "id": "G2_fixture_004: Get weather and stock data together",
+    "conversations": [
+      {
+        "from": "system",
+        "value": "You are AutoGPT, you can use many tools(functions) to do the following task.\nFirst I will give you the task description, and your task start.\nAt each step, you need to give your thought to analyze the status now and what to do next, with a function call to actually excute your step. Your output should follow this format:\nThought:\nAction\nAction Input:\n\nAfter the call, you will get the call result, and you are now in a new state.\nThen you will analyze your status now, then decide what to do next...\nAfter many (Thought-call) pairs, you finally perform the task, then you can give your finial answer.\nRemember: \n1.the state change is irreversible, you can't go back to one of the former state, if you want to restart the task, say \"I give up and restart\".\n2.All the thought is short, at most in 5 sentence.\n3.You can do more then one trys, so if your plan is to continusly try some conditions, you can do one of the conditions per try.\nLet's Begin!\nTask description: You should use functions to help handle the real time user querys. Remember:\n1.ALWAYS call \"Finish\" function at the end of the task. And the final answer should contain enough information to show to the user,If you can't handle the task, or you find that function calls always fail(the function is not valid now), use function Finish->give_up_and_restart.\n2.Do not use origin tool names, use only subfunctions' names.\nYou have access of the following tools:\n1.open_weather: Provides current weather data and forecasts.\n2.stock_tracker: Real-time stock market data.\n\nSpecifically, you have access to the following APIs: [{'name': 'get_current_weather_for_open_weather', 'description': 'Get current weather', 'parameters': {'type': 'object', 'properties': {'location': {'type': 'string'}}, 'required': ['location'], 'optional': []}}, {'name': 'get_stock_price_for_stock_tracker', 'description': 'Get stock price', 'parameters': {'type': 'object', 'properties': {'symbol': {'type': 'string'}}, 'required': ['symbol'], 'optional': []}}, {'name': 'Finish', 'description': 'Finish the task.', 'parameters': {'type': 'object', 'properties': {'return_type': {'type': 'string', 'enum': ['give_answer', 'give_up_and_restart']}, 'final_answer': {'type': 'string'}}, 'required': ['return_type']}}]"
+      },
+      {
+        "from": "user",
+        "value": "\nWhat is the weather in NYC and what is TSLA stock price?\nBegin!\n"
+      },
+      {
+        "from": "assistant",
+        "value": "\nThought: I need both weather and stock data. Let me start with weather.\nAction: get_current_weather_for_open_weather\nAction Input: {\n  \"location\": \"NYC\"\n}\n"
+      },
+      {
+        "from": "function",
+        "value": "{\"error\": \"\", \"response\": {\"temperature\": \"22C\", \"condition\": \"Sunny\"}}"
+      },
+      {
+        "from": "assistant",
+        "value": "\nThought: Got weather. Now get TSLA stock price.\nAction: get_stock_price_for_stock_tracker\nAction Input: {\n  \"symbol\": \"TSLA\"\n}\n"
+      },
+      {
+        "from": "function",
+        "value": "{\"error\": \"\", \"response\": {\"symbol\": \"TSLA\", \"price\": 245.00}}"
+      },
+      {
+        "from": "assistant",
+        "value": "\nThought: I have both pieces of information.\nAction: Finish\nAction Input: {\n  \"return_type\": \"give_answer\",\n  \"final_answer\": \"NYC weather: 22C Sunny. TSLA stock: $245.00.\"\n}\n"
+      }
+    ]
+  },
+  {
+    "id": "G1_fixture_005: Failed attempt to get weather",
+    "conversations": [
+      {
+        "from": "system",
+        "value": "You are AutoGPT, you can use many tools(functions) to do the following task.\nFirst I will give you the task description, and your task start.\nAt each step, you need to give your thought to analyze the status now and what to do next, with a function call to actually excute your step. Your output should follow this format:\nThought:\nAction\nAction Input:\n\nAfter the call, you will get the call result, and you are now in a new state.\nThen you will analyze your status now, then decide what to do next...\nAfter many (Thought-call) pairs, you finally perform the task, then you can give your finial answer.\nRemember: \n1.the state change is irreversible, you can't go back to one of the former state, if you want to restart the task, say \"I give up and restart\".\n2.All the thought is short, at most in 5 sentence.\n3.You can do more then one trys, so if your plan is to continusly try some conditions, you can do one of the conditions per try.\nLet's Begin!\nTask description: You should use functions to help handle the real time user querys. Remember:\n1.ALWAYS call \"Finish\" function at the end of the task. And the final answer should contain enough information to show to the user,If you can't handle the task, or you find that function calls always fail(the function is not valid now), use function Finish->give_up_and_restart.\n2.Do not use origin tool names, use only subfunctions' names.\nYou have access of the following tools:\n1.open_weather: Provides current weather data and forecasts.\n\nSpecifically, you have access to the following APIs: [{'name': 'get_current_weather_for_open_weather', 'description': 'Get current weather', 'parameters': {'type': 'object', 'properties': {'location': {'type': 'string'}}, 'required': ['location'], 'optional': []}}, {'name': 'Finish', 'description': 'Finish the task.', 'parameters': {'type': 'object', 'properties': {'return_type': {'type': 'string', 'enum': ['give_answer', 'give_up_and_restart']}, 'final_answer': {'type': 'string'}}, 'required': ['return_type']}}]"
+      },
+      {
+        "from": "user",
+        "value": "\nWhat is the weather on Mars?\nBegin!\n"
+      },
+      {
+        "from": "assistant",
+        "value": "\nThought: I'll try to get weather for Mars but this might not work.\nAction: get_current_weather_for_open_weather\nAction Input: {\n  \"location\": \"Mars\"\n}\n"
+      },
+      {
+        "from": "function",
+        "value": "{\"error\": \"Location not found\", \"response\": \"\"}"
+      },
+      {
+        "from": "assistant",
+        "value": "\nThought: The API cannot handle Mars. I should give up.\nAction: Finish\nAction Input: {\n  \"return_type\": \"give_up_and_restart\"\n}\n"
+      }
+    ]
+  }
+]

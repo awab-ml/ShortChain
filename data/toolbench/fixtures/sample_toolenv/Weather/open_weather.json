@@ -1,0 +1,38 @@
+{
+  "product_id": "api_001",
+  "tool_description": "Provides current weather data and forecasts for any location worldwide.",
+  "home_url": "https://example.com/weather",
+  "name": "Open Weather",
+  "title": "Open Weather API",
+  "pricing": "freemium",
+  "tool_name": "Open Weather",
+  "score": 4.5,
+  "host": "open-weather.p.rapidapi.com",
+  "api_list": [
+    {
+      "name": "get_current_weather",
+      "url": "https://open-weather.p.rapidapi.com/current",
+      "description": "Get current weather conditions for a specified location including temperature, humidity, and wind speed.",
+      "method": "GET",
+      "required_parameters": [
+        {"name": "location", "type": "STRING", "description": "City name or coordinates"}
+      ],
+      "optional_parameters": [
+        {"name": "units", "type": "STRING", "description": "Units of measurement (metric/imperial)", "example_value": "metric"}
+      ]
+    },
+    {
+      "name": "get_forecast",
+      "url": "https://open-weather.p.rapidapi.com/forecast",
+      "description": "Get 5-day weather forecast for a specified location with 3-hour intervals.",
+      "method": "GET",
+      "required_parameters": [
+        {"name": "location", "type": "STRING", "description": "City name or coordinates"}
+      ],
+      "optional_parameters": [
+        {"name": "days", "type": "NUMBER", "description": "Number of forecast days", "example_value": "5"}
+      ]
+    }
+  ],
+  "standardized_name": "open_weather"
+}

@@ -1,0 +1,47 @@
+{
+  "product_id": "api_002",
+  "tool_description": "Real-time stock market data and historical prices for global exchanges.",
+  "home_url": "https://example.com/stocks",
+  "name": "Stock Tracker",
+  "title": "Stock Tracker API",
+  "pricing": "freemium",
+  "tool_name": "Stock Tracker",
+  "score": 4.2,
+  "host": "stock-tracker.p.rapidapi.com",
+  "api_list": [
+    {
+      "name": "get_stock_price",
+      "url": "https://stock-tracker.p.rapidapi.com/price",
+      "description": "Get current stock price and basic info for a given ticker symbol.",
+      "method": "GET",
+      "required_parameters": [
+        {"name": "symbol", "type": "STRING", "description": "Stock ticker symbol (e.g., AAPL)"}
+      ],
+      "optional_parameters": []
+    },
+    {
+      "name": "get_historical_prices",
+      "url": "https://stock-tracker.p.rapidapi.com/historical",
+      "description": "Get historical stock prices for a given ticker over a date range.",
+      "method": "GET",
+      "required_parameters": [
+        {"name": "symbol", "type": "STRING", "description": "Stock ticker symbol"},
+        {"name": "start_date", "type": "STRING", "description": "Start date in YYYY-MM-DD format"}
+      ],
+      "optional_parameters": [
+        {"name": "end_date", "type": "STRING", "description": "End date in YYYY-MM-DD format"}
+      ]
+    },
+    {
+      "name": "get_market_summary",
+      "url": "https://stock-tracker.p.rapidapi.com/summary",
+      "description": "Get a summary of major market indices and their current values.",
+      "method": "GET",
+      "required_parameters": [],
+      "optional_parameters": [
+        {"name": "region", "type": "STRING", "description": "Market region (US, EU, ASIA)"}
+      ]
+    }
+  ],
+  "standardized_name": "stock_tracker"
+}

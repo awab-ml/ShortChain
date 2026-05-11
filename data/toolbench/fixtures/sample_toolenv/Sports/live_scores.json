@@ -1,0 +1,34 @@
+{
+  "product_id": "api_003",
+  "tool_description": "Live sports scores and match data for football, basketball, and cricket.",
+  "home_url": "https://example.com/sports",
+  "name": "Live Scores",
+  "title": "Live Scores API",
+  "pricing": "free",
+  "tool_name": "Live Scores",
+  "score": 4.0,
+  "host": "live-scores.p.rapidapi.com",
+  "api_list": [
+    {
+      "name": "get_live_matches",
+      "url": "https://live-scores.p.rapidapi.com/live",
+      "description": "Get all currently live matches across supported sports.",
+      "method": "GET",
+      "required_parameters": [],
+      "optional_parameters": [
+        {"name": "sport", "type": "STRING", "description": "Filter by sport type"}
+      ]
+    },
+    {
+      "name": "get_match_details",
+      "url": "https://live-scores.p.rapidapi.com/match",
+      "description": "Get detailed information for a specific match including lineups and stats.",
+      "method": "GET",
+      "required_parameters": [
+        {"name": "match_id", "type": "STRING", "description": "Unique match identifier"}
+      ],
+      "optional_parameters": []
+    }
+  ],
+  "standardized_name": "live_scores"
+}
