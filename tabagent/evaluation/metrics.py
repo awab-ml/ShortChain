@@ -122,6 +122,111 @@ def recall_at_k(
     return float(np.mean(recalls)) if recalls else 0.0
 
 
+def pass_rate(
+    y_true: np.ndarray,
+    y_scores: np.ndarray,
+    task_ids: np.ndarray,
+    k: int = 5,
+) -> float:
+    """Compute ToolBench-style pass rate.
+
+    For each task, check if **at least one** relevant tool appears in
+    the top-k predictions.  The pass rate is the fraction of tasks that
+    pass this criterion.
+
+    .. math::
+
+        PassRate@k = \\frac{1}{|T|} \\sum_{t \\in T}
+                     \\mathbb{1}[|S_k(t) \\cap G(t)| \\geq 1]
+
+    Parameters
+    ----------
+    y_true
+        Binary labels (1 = relevant).
+    y_scores
+        Predicted scores / probabilities.
+    task_ids
+        Task ID for each sample.
+    k
+        Number of candidates retrieved.
+
+    Returns
+    -------
+    float
+        Fraction of tasks with at least one hit in top-k.
+    """
+    unique_tasks = np.unique(task_ids)
+    passes = []
+
+    for tid in unique_tasks:
+        mask = task_ids == tid
+        true = y_true[mask]
+        scores = y_scores[mask]
+
+        r = int(true.sum())
+        if r == 0:
+            continue
+
+        top_k_idx = np.argsort(scores)[::-1][:k]
+        hits = true[top_k_idx].sum()
+        passes.append(1.0 if hits >= 1 else 0.0)
+
+    return float(np.mean(passes)) if passes else 0.0
+
+
+def metrics_by_group(
+    y_true: np.ndarray,
+    y_proba: np.ndarray,
+    X_val: pd.DataFrame,
+    group_col: str = "app_name",
+    k_values: list[int] | None = None,
+) -> pd.DataFrame:
+    """Compute metrics grouped by a column (e.g., category).
+
+    Parameters
+    ----------
+    y_true
+        Ground-truth binary labels.
+    y_proba
+        Predicted probabilities.
+    X_val
+        Validation DataFrame with ``task_id`` and *group_col* columns.
+    group_col
+        Column to group by.
+    k_values
+        List of k values for Recall@k.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per group, columns are metric names.
+    """
+    k_values = k_values or [3, 5, 7, 9]
+
+    if group_col not in X_val.columns:
+        return pd.DataFrame()
+
+    results: list[dict[str, Any]] = []
+    groups = X_val[group_col].unique()
+
+    for group in sorted(groups):
+        mask = X_val[group_col].values == group
+        if mask.sum() == 0:
+            continue
+
+        group_metrics = compute_metrics(
+            y_true[mask],
+            y_proba[mask],
+            X_val[mask],
+            k_values=k_values,
+        )
+        group_metrics[group_col] = group
+        group_metrics["n_samples"] = int(mask.sum())
+        results.append(group_metrics)
+
+    return pd.DataFrame(results)
+
+
 def compute_metrics(
     y_true: np.ndarray,
     y_proba: np.ndarray,
@@ -176,6 +281,7 @@ def compute_metrics(
 
         for k in k_values:
             metrics[f"recall_at_{k}"] = recall_at_k(y_true, y_proba, task_ids, k)
+            metrics[f"pass_rate_at_{k}"] = pass_rate(y_true, y_proba, task_ids, k)
 
     return metrics
 
