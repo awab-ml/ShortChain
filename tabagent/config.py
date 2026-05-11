@@ -140,6 +140,18 @@ class InferenceConfig(BaseModel):
     confidence_threshold: float = 0.5
 
 
+class ToolBenchConfig(BaseModel):
+    """ToolBench benchmark settings."""
+
+    data_dir: str = "data/toolbench"
+    toolenv_dir: str = "data/toolbench/data/toolenv/tools"
+    scenario: str = "G1"                    # G1 | G2 | G3
+    granularity: str = "api"                # api | tool
+    use_preprocessed: bool = True
+    train_file: str = "data/toolbench/data/toolllama_G123_dfs_train.json"
+    eval_file: str = "data/toolbench/data/toolllama_G123_dfs_eval.json"
+
+
 class EvaluationConfig(BaseModel):
     """Evaluation settings."""
 
@@ -169,6 +181,7 @@ class TabAgentConfig(BaseModel):
     classifier: ClassifierConfig = Field(default_factory=ClassifierConfig)
     inference: InferenceConfig = Field(default_factory=InferenceConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
+    toolbench: ToolBenchConfig = Field(default_factory=ToolBenchConfig)
 
 
 # ---------------------------------------------------------------------------

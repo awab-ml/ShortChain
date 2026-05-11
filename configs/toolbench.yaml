@@ -1,0 +1,64 @@
+# ToolBench G1 Benchmark Configuration
+# =====================================
+# Optimised for single-tool (G1) scenario with API-level granularity.
+# Use: python scripts/benchmark_toolbench.py --config configs/toolbench.yaml
+
+toolbench:
+  scenario: "G1"
+  granularity: "api"
+  use_preprocessed: true
+  data_dir: "data/toolbench"
+  toolenv_dir: "data/toolbench/data/toolenv/tools"
+  train_file: "data/toolbench/data/toolllama_G123_dfs_train.json"
+  eval_file: "data/toolbench/data/toolllama_G123_dfs_eval.json"
+
+ingest:
+  success_only: true
+
+features:
+  text_encoder: "tfidf"
+  tfidf_max_features: 10000    # Larger vocab for 16K+ API endpoints
+  include_state_features: true
+  include_dependency_features: true
+
+negatives:
+  strategy: "hard"              # Hard negatives crucial with large catalog
+  hard_negative_ratio: 0.5
+  same_app_weight: 0.4          # same-category tools as hard negatives
+  co_usage_weight: 0.3
+  similarity_weight: 0.3
+
+dataset:
+  negative_ratio: 5             # Higher ratio for large catalog
+
+classifier:
+  model_type: "xgboost"
+  xgboost:
+    n_estimators: 500
+    max_depth: 10
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_weight: 5
+    eval_metric: "logloss"
+    early_stopping_rounds: 30
+
+splitter:
+  n_folds: 5
+  test_size: 0.2
+  group_by: "task_id"
+  stratify_by:
+    - "app_name"
+
+inference:
+  top_k: 5
+  confidence_threshold: 0.5
+
+evaluation:
+  k_values: [1, 3, 5, 7, 10]
+  metrics:
+    - "r_precision"
+    - "recall_at_k"
+    - "pass_rate"
+    - "accuracy"
+    - "f1"
