@@ -43,6 +43,7 @@ htmlcov/
 # Models & data (large files)
 models/
 data/
+results/
 
 # uv
 uv.lock
