@@ -160,13 +160,34 @@ class DatasetBuilder:
             row = {**context, **tool_features, "label": 1}
             rows.append(row)
 
-        # Negative pairs via sampler
-        n_negatives = len(traj.tools_used) * self.config.negative_ratio
-        negative_tools = sampler.sample(
-            positive_tools=traj.tools_used,
-            app_name=traj.app_name,
-            n=n_negatives,
-        )
+        # Negative pairs — constrained to available tools when present
+        available_tools = set(traj.metadata.get("available_tools", []))
+
+        if available_tools:
+            # Candidate constraint: only sample from tools listed in
+            # the system prompt (the ones the agent actually has access to).
+            # This matches inference conditions exactly.
+            constrained_pool = list(available_tools - traj.tools_used)
+            n_negatives = min(
+                len(constrained_pool),
+                len(traj.tools_used) * self.config.negative_ratio,
+            )
+            if constrained_pool:
+                import random as _rng
+                negative_tools = _rng.sample(
+                    constrained_pool, min(int(n_negatives), len(constrained_pool))
+                )
+            else:
+                negative_tools = []
+        else:
+            # Fallback: use standard sampler with full catalog
+            n_negatives = len(traj.tools_used) * self.config.negative_ratio
+            negative_tools = sampler.sample(
+                positive_tools=traj.tools_used,
+                app_name=traj.app_name,
+                n=n_negatives,
+            )
+
         for tool_name in negative_tools:
             tool_features = tool_builder.build(
                 tool_name,

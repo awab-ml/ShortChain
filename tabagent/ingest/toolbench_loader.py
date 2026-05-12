@@ -341,11 +341,20 @@ class ToolBenchLoader:
         # Determine success
         success = _determine_success(conversations)
 
+        # Resolve available API keys from system prompt tools
+        available_tools: list[str] = []
+        if self.catalog:
+            for tool in tool_names:
+                tool_norm = tool.lower().replace(" ", "_")
+                apis = self.catalog.tool_to_apis.get(tool_norm, [])
+                available_tools.extend(apis)
+
         # Store the number of tools from system prompt in metadata
         metadata: dict[str, Any] = {
             "raw_id": raw_id[:200],
             "n_system_tools": len(tool_names),
             "system_tool_names": tool_names,
+            "available_tools": sorted(set(available_tools)),
         }
 
         return Trajectory(
