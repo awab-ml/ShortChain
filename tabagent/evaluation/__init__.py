@@ -7,6 +7,7 @@ from tabagent.evaluation.metrics import (
     pass_rate,
     r_precision,
     recall_at_k,
+    step_wise_accuracy,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "pass_rate",
     "r_precision",
     "recall_at_k",
+    "step_wise_accuracy",
 ]

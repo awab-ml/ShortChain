@@ -4,14 +4,16 @@
 Usage::
 
     python scripts/benchmark_toolbench.py --config configs/toolbench.yaml
+    python scripts/benchmark_toolbench.py --config configs/toolbench_g2.yaml
 
 This script:
 1. Loads the tool catalog from ToolBench's toolenv
 2. Loads and filters trajectories to the configured scenario (G1/G2/G3)
-3. Builds (context, tool, label) dataset pairs
-4. Trains the classifier
-5. Evaluates with R-Precision, Recall@k, and Pass Rate
-6. Saves results to JSON
+3. For G2+: applies step-level expansion and hybrid failure negatives
+4. Builds (context, tool, label) dataset pairs
+5. Trains the classifier
+6. Evaluates with R-Precision, Recall@k, Pass Rate, and step-wise accuracy
+7. Saves results to JSON
 """
 
 from __future__ import annotations
@@ -28,10 +30,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from tabagent.config import load_config
 from tabagent.dataset.builder import DatasetBuilder
 from tabagent.dataset.splitter import GroupStratifiedSplitter
-from tabagent.evaluation.metrics import compute_metrics, format_metrics, metrics_by_group
+from tabagent.evaluation.metrics import (
+    compute_metrics,
+    format_metrics,
+    metrics_by_group,
+    step_wise_accuracy,
+)
 from tabagent.head.trainer import Trainer
 from tabagent.ingest.toolbench_catalog import ToolBenchCatalog
 from tabagent.ingest.toolbench_loader import ToolBenchLoader
+from tabagent.ingest.toolbench_negatives import FailureNegativeExtractor
 from tabagent.utils.io import ensure_dir
 from tabagent.utils.logging import get_logger
 
@@ -74,6 +82,8 @@ def main() -> None:
     tb = cfg.toolbench
     log.info(f"Scenario:    {tb.scenario}")
     log.info(f"Granularity: {tb.granularity}")
+    log.info(f"Step-level:  {tb.step_level}")
+    log.info(f"Failure neg: {tb.use_failure_negatives} (ratio={tb.failure_negative_ratio})")
     log.info(f"Classifier:  {cfg.classifier.model_type}")
     log.info("")
 
@@ -95,8 +105,32 @@ def main() -> None:
     log.info("")
     log.info(f"[bold]Step 2:[/bold] Loading {tb.scenario} trajectories...")
 
-    loader = ToolBenchLoader(catalog=catalog, success_only=cfg.ingest.success_only)
-    trajectories = loader.load_with_filter(tb.train_file, scenario=tb.scenario)
+    # For hybrid strategy: load ALL (success + failure), then split
+    loader = ToolBenchLoader(catalog=catalog, success_only=False)
+    all_trajectories = loader.load_with_filter(
+        tb.train_file,
+        scenario=tb.scenario,
+        step_level=False,  # Expand after splitting success/failure
+    )
+
+    # Split into success / failure BEFORE step expansion
+    success_trajs = [t for t in all_trajectories if t.success]
+    failed_trajs = [t for t in all_trajectories if not t.success]
+
+    log.info(f"  Successful: {len(success_trajs):,}")
+    log.info(f"  Failed:     {len(failed_trajs):,}")
+
+    # Apply step-level expansion to successful trajectories only
+    if tb.step_level:
+        expanded = []
+        for traj in success_trajs:
+            expanded.extend(ToolBenchLoader.expand_to_step_trajectories(traj))
+        log.info(
+            f"  Step expansion: {len(success_trajs):,} → {len(expanded):,} step-trajectories"
+        )
+        trajectories = expanded
+    else:
+        trajectories = success_trajs
 
     if args.max_train and len(trajectories) > args.max_train:
         log.info(f"  Limiting to {args.max_train} trajectories (--max-train)")
@@ -106,7 +140,7 @@ def main() -> None:
         log.error("No trajectories loaded. Check data and config.")
         return
 
-    log.info(f"  Loaded {len(trajectories):,} trajectories")
+    log.info(f"  Training on {len(trajectories):,} trajectories")
 
     # ------------------------------------------------------------------
     # 4. Build dataset
@@ -122,6 +156,21 @@ def main() -> None:
     )
     df = builder.build(trajectories)
     log.info(f"  Dataset: {len(df):,} rows")
+
+    # Augment with failure negatives (hybrid strategy C)
+    if tb.use_failure_negatives and failed_trajs:
+        log.info("")
+        log.info("[bold]Step 3b:[/bold] Adding failure negatives...")
+        extractor = FailureNegativeExtractor(
+            catalog=catalog.catalog,
+            ratio=tb.failure_negative_ratio,
+        )
+        df = extractor.augment_negatives(
+            df,
+            failed_trajectories=failed_trajs,
+            corpus_stats=builder.corpus_stats,
+        )
+        log.info(f"  Augmented dataset: {len(df):,} rows")
 
     # ------------------------------------------------------------------
     # 5. Split
@@ -167,6 +216,23 @@ def main() -> None:
     log.info("[bold]═══ Results ═══[/bold]")
     log.info(format_metrics(metrics))
 
+    # Step-wise accuracy (for G2 step-level)
+    step_metrics = {}
+    if tb.step_level and "step_index" in test_df.columns:
+        import numpy as np
+        step_metrics = step_wise_accuracy(
+            y_test,
+            y_proba,
+            test_df["task_id"].values,
+            test_df["step_index"].values.astype(int),
+            k=3,
+        )
+        if step_metrics:
+            log.info("")
+            log.info("[bold]Step-wise Pass Rate@3:[/bold]")
+            for step_name, acc in sorted(step_metrics.items()):
+                log.info(f"  {step_name}: {acc:.4f}")
+
     # Per-category breakdown
     if "app_name" in test_df.columns:
         log.info("")
@@ -177,7 +243,6 @@ def main() -> None:
             k_values=cfg.evaluation.k_values,
         )
         if not cat_metrics.empty:
-            # Show top and bottom categories by R-precision
             if "r_precision" in cat_metrics.columns:
                 cat_metrics = cat_metrics.sort_values("r_precision", ascending=False)
                 log.info(f"  Top 5 categories by R-Precision:")
@@ -196,11 +261,16 @@ def main() -> None:
 
     results = {
         "scenario": tb.scenario,
-        "n_trajectories": len(trajectories),
+        "step_level": tb.step_level,
+        "use_failure_negatives": tb.use_failure_negatives,
+        "n_success_trajectories": len(success_trajs),
+        "n_failed_trajectories": len(failed_trajs),
+        "n_training_trajectories": len(trajectories),
         "n_train": len(train_df),
         "n_test": len(test_df),
         "catalog_size": summary["n_apis"],
         "metrics": metrics,
+        "step_metrics": step_metrics,
         "elapsed_seconds": round(time.time() - t_start, 1),
     }
 

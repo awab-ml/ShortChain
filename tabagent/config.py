@@ -151,6 +151,11 @@ class ToolBenchConfig(BaseModel):
     train_file: str = "data/toolbench/data/toolllama_G123_dfs_train.json"
     eval_file: str = "data/toolbench/data/toolllama_G123_dfs_eval.json"
 
+    # G2-specific settings
+    step_level: bool = False                # Per-step training pairs
+    use_failure_negatives: bool = False     # Hybrid strategy C
+    failure_negative_ratio: float = 0.3     # 30% of negatives from failures
+
 
 class EvaluationConfig(BaseModel):
     """Evaluation settings."""

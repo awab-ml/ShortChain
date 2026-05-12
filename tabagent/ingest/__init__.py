@@ -5,6 +5,7 @@ from tabagent.ingest.base import TrajectoryLoader
 from tabagent.ingest.loader import JSONLTrajectoryLoader, load_trajectories
 from tabagent.ingest.toolbench_catalog import ToolBenchCatalog
 from tabagent.ingest.toolbench_loader import ToolBenchLoader
+from tabagent.ingest.toolbench_negatives import FailureNegativeExtractor
 
 __all__ = [
     "Step",
@@ -14,4 +15,5 @@ __all__ = [
     "load_trajectories",
     "ToolBenchCatalog",
     "ToolBenchLoader",
+    "FailureNegativeExtractor",
 ]

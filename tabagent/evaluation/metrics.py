@@ -286,9 +286,67 @@ def compute_metrics(
     return metrics
 
 
+def step_wise_accuracy(
+    y_true: np.ndarray,
+    y_scores: np.ndarray,
+    task_ids: np.ndarray,
+    step_indices: np.ndarray,
+    k: int = 1,
+) -> dict[str, float]:
+    """Compute top-k accuracy broken down by step index.
+
+    This measures whether the correct tool appears in the top-k
+    predictions, grouped by which step in the trajectory the
+    decision corresponds to (step 0 = first decision, step 1 =
+    second, etc.).
+
+    Useful for G2 analysis: do later steps (with more context from
+    prior tool calls) produce better predictions?
+
+    Parameters
+    ----------
+    y_true
+        Binary labels.
+    y_scores
+        Predicted scores.
+    task_ids
+        Task ID per sample.
+    step_indices
+        Step index per sample (from ``metadata["step_index"]``).
+    k
+        Top-k for accuracy.
+
+    Returns
+    -------
+    dict[str, float]
+        ``{"step_0": acc, "step_1": acc, ...}``
+    """
+    unique_steps = sorted(set(step_indices))
+    results: dict[str, float] = {}
+
+    for step_idx in unique_steps:
+        step_mask = step_indices == step_idx
+        step_true = y_true[step_mask]
+        step_scores = y_scores[step_mask]
+        step_tasks = task_ids[step_mask]
+
+        if len(step_true) == 0:
+            continue
+
+        # Compute pass_rate@k for this step
+        pr = pass_rate(step_true, step_scores, step_tasks, k=k)
+        results[f"step_{step_idx}"] = pr
+
+    return results
+
+
 def format_metrics(metrics: dict[str, float], indent: int = 2) -> str:
     """Pretty-format a metrics dictionary for display."""
     lines = []
     for key, value in sorted(metrics.items()):
-        lines.append(f"{' ' * indent}{key:>20s}: {value:.4f}")
+        if isinstance(value, float):
+            lines.append(f"{' ' * indent}{key:>20s}: {value:.4f}")
+        else:
+            lines.append(f"{' ' * indent}{key:>20s}: {value}")
     return "\n".join(lines)
+

@@ -1,0 +1,73 @@
+# ToolBench G2 (Intra-Category Multi-Tool) Benchmark Configuration
+# =================================================================
+# Optimised for multi-tool scenarios where all tools share the same
+# category. Uses step-level expansion and hybrid failure negatives.
+#
+# Usage:
+#   python scripts/benchmark_toolbench.py --config configs/toolbench_g2.yaml
+
+toolbench:
+  scenario: "G2"
+  granularity: "api"
+  use_preprocessed: true
+  data_dir: "data/toolbench"
+  toolenv_dir: "data/toolbench/data/toolenv/tools"
+  train_file: "data/toolbench/data/toolllama_G123_dfs_train.json"
+  eval_file: "data/toolbench/data/toolllama_G123_dfs_eval.json"
+
+  # G2-specific
+  step_level: true             # Per-step training pairs
+  use_failure_negatives: true  # Hybrid strategy C
+  failure_negative_ratio: 0.3  # 30% of negatives from failures
+
+ingest:
+  success_only: false           # Load failures too (for hard negatives)
+
+features:
+  text_encoder: "tfidf"
+  tfidf_max_features: 10000
+  include_state_features: true
+  include_dependency_features: true
+
+negatives:
+  strategy: "hard"              # Critical for same-category confusion
+  hard_negative_ratio: 0.7      # Higher hard neg ratio than G1
+  same_app_weight: 0.6          # Same-category negatives are key
+  co_usage_weight: 0.2
+  similarity_weight: 0.2
+
+dataset:
+  negative_ratio: 7             # More negatives for harder task
+
+classifier:
+  model_type: "xgboost"
+  xgboost:
+    n_estimators: 800            # More trees for harder task
+    max_depth: 12
+    learning_rate: 0.03          # Lower LR, more trees
+    subsample: 0.7
+    colsample_bytree: 0.7
+    min_child_weight: 5
+    eval_metric: "logloss"
+    early_stopping_rounds: 40
+
+splitter:
+  n_folds: 5
+  test_size: 0.2
+  group_by: "task_id"
+  stratify_by:
+    - "app_name"
+
+inference:
+  top_k: 5
+  confidence_threshold: 0.5
+
+evaluation:
+  k_values: [1, 3, 5, 7, 10]
+  metrics:
+    - "r_precision"
+    - "recall_at_k"
+    - "pass_rate"
+    - "step_wise_accuracy"
+    - "accuracy"
+    - "f1"
