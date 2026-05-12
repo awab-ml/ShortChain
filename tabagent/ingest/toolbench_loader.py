@@ -92,24 +92,27 @@ class ToolBenchLoader:
         self,
         path: str | Path,
         scenario: str = "G1",
+        step_level: bool = False,
     ) -> list[Trajectory]:
         """Load and filter trajectories to a specific scenario.
 
         Scenario detection:
         - **G1** (single-tool): system prompt lists exactly 1 tool
         - **G2** (intra-category multi-tool): system prompt lists 2+ tools
+          from the same category
         - **G3** (intra-collection multi-tool): system prompt lists 2+ tools
           from different categories
-
-        For simplicity, G1 filtering checks that only 1 tool is listed
-        in the system prompt (excluding the ``Finish`` pseudo-tool).
 
         Parameters
         ----------
         path
             Path to preprocessed JSON file.
         scenario
-            ``"G1"``, ``"G2"``, or ``"G3"``.
+            ``"G1"``, ``"G2"``, ``"G3"``, or ``"all"``.
+        step_level
+            If ``True``, expand multi-step trajectories into per-step
+            sub-trajectories for step-level training.  Each step becomes
+            its own ``Trajectory`` with the correct prior-step context.
 
         Returns
         -------
@@ -118,18 +121,148 @@ class ToolBenchLoader:
         all_trajectories = self.load(path)
 
         if scenario == "G1":
-            filtered = [t for t in all_trajectories if self._is_single_tool(t)]
+            filtered = [
+                t for t in all_trajectories
+                if self._classify_scenario(t) == "G1"
+            ]
         elif scenario == "G2":
-            filtered = [t for t in all_trajectories if not self._is_single_tool(t)]
+            filtered = [
+                t for t in all_trajectories
+                if self._classify_scenario(t) == "G2"
+            ]
+        elif scenario == "G3":
+            filtered = [
+                t for t in all_trajectories
+                if self._classify_scenario(t) == "G3"
+            ]
         else:
-            # G3 or "all"
             filtered = all_trajectories
 
         log.info(
             f"Filtered to {scenario}: [bold]{len(filtered)}[/bold] / "
             f"{len(all_trajectories)} trajectories"
         )
+
+        if step_level:
+            expanded = []
+            for traj in filtered:
+                expanded.extend(self.expand_to_step_trajectories(traj))
+            log.info(
+                f"Step-level expansion: {len(filtered)} trajectories → "
+                f"[bold]{len(expanded)}[/bold] step-trajectories"
+            )
+            return expanded
+
         return filtered
+
+    # ------------------------------------------------------------------
+    # Step-level expansion
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def expand_to_step_trajectories(traj: Trajectory) -> list[Trajectory]:
+        """Expand a multi-step trajectory into per-step sub-trajectories.
+
+        For a trajectory with steps ``[A, B, C]``, produces three
+        sub-trajectories, each representing one decision point:
+
+        - ``Trajectory(steps=[], tools_used={A})``
+          → "at step 0, with no prior context, chose A"
+        - ``Trajectory(steps=[A], tools_used={B})``
+          → "at step 1, after calling A, chose B"
+        - ``Trajectory(steps=[A, B], tools_used={C})``
+          → "at step 2, after calling A then B, chose C"
+
+        Each sub-trajectory preserves the original ``intent``,
+        ``app_name``, and ``metadata``, but gets a unique ``task_id``
+        (``"{original_id}_s{step_index}"``).  The ``tools_used`` set
+        contains **only** the tool chosen at that specific step.
+
+        This allows ``DatasetBuilder`` to create training pairs with
+        step-specific context features (``previous_tools``,
+        ``last_thought``, ``step_index``, etc.) via the existing
+        ``ContextFeatureBuilder.build(traj, step_index=None)`` pathway,
+        since each sub-trajectory already has the correct step history
+        baked in.
+
+        Parameters
+        ----------
+        traj
+            A multi-step trajectory.
+
+        Returns
+        -------
+        list[Trajectory]
+            One sub-trajectory per step.  Returns a single-element list
+            (the original trajectory) if there is only one step.
+        """
+        if len(traj.steps) <= 1:
+            return [traj]
+
+        sub_trajectories: list[Trajectory] = []
+
+        for i, step in enumerate(traj.steps):
+            tool_name = step.tool_name
+            if not tool_name:
+                continue
+
+            # Prior steps = all steps before this one
+            prior_steps = list(traj.steps[:i])
+
+            sub_traj = Trajectory(
+                task_id=f"{traj.task_id}_s{i}",
+                intent=traj.intent,
+                steps=prior_steps,
+                success=traj.success,
+                app_name=traj.app_name,
+                tools_used={tool_name},
+                metadata={
+                    **traj.metadata,
+                    "step_index": i,
+                    "parent_task_id": traj.task_id,
+                    "total_steps": len(traj.steps),
+                },
+            )
+            sub_trajectories.append(sub_traj)
+
+        return sub_trajectories
+
+    # ------------------------------------------------------------------
+    # Scenario classification
+    # ------------------------------------------------------------------
+
+    def _classify_scenario(self, traj: Trajectory) -> str:
+        """Classify a trajectory as G1, G2, or G3.
+
+        - **G1**: System prompt lists exactly 1 tool.
+        - **G2**: System prompt lists 2+ tools, all from the same category.
+        - **G3**: System prompt lists 2+ tools from different categories.
+
+        Falls back to tool-count heuristic if catalog is not available.
+        """
+        tool_names = traj.metadata.get("system_tool_names", [])
+        n_tools = traj.metadata.get("n_system_tools", len(tool_names))
+
+        if n_tools <= 1:
+            return "G1"
+
+        if not self.catalog:
+            # Without catalog, can't distinguish G2 vs G3
+            return "G2"
+
+        # Check if all tools share a single category
+        categories: set[str] = set()
+        for tool in tool_names:
+            tool_norm = tool.lower().replace(" ", "_")
+            apis = self.catalog.tool_to_apis.get(tool_norm, [])
+            if apis:
+                cat = self.catalog.get_category(apis[0])
+                if cat:
+                    categories.add(cat)
+
+        if len(categories) <= 1:
+            return "G2"
+        return "G3"
 
     # ------------------------------------------------------------------
     # Parsing
