@@ -20,7 +20,7 @@ import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 
 from tabagent.config import FeaturesConfig
-from tabagent.features.encoders import TfidfEncoder, create_encoder
+from tabagent.features.encoders import TfidfEncoder, SemanticSimilarityEncoder, create_encoder
 from tabagent.utils.logging import get_logger
 
 log = get_logger(__name__)
@@ -57,6 +57,13 @@ _BOOL_COLS = [
 # Categorical columns that get label-encoded
 _CAT_COLS = ["app_name"]
 
+# Similarity pairs: (column_a, column_b, feature_name, prefix_a, prefix_b)
+_SIMILARITY_PAIRS = [
+    ("intent", "tool_description", "intent_tool_similarity"),
+    ("last_thought", "tool_description", "thought_tool_similarity"),
+    ("intent", "tool_category", "intent_category_similarity"),
+]
+
 
 class FeaturePipeline:
     """Orchestrates feature extraction and encoding.
@@ -71,6 +78,7 @@ class FeaturePipeline:
         self.config = config or FeaturesConfig()
         self._encoders: dict[str, Any] = {}
         self._label_encoders: dict[str, LabelEncoder] = {}
+        self._similarity_encoder: SemanticSimilarityEncoder | None = None
         self._skipped_text_cols: set[str] = set()
         self._is_fitted = False
 
@@ -136,6 +144,12 @@ class FeaturePipeline:
             vals = df[col].astype(int).values.reshape(-1, 1).astype(np.float32)
             parts.append(vals)
 
+        # Semantic similarity features (e5-small-v2)
+        if self.config.include_semantic_similarity:
+            sim_parts = self._compute_similarity_features(df)
+            if sim_parts is not None:
+                parts.append(sim_parts)
+
         if not parts:
             raise ValueError("No features to encode — check column names")
 
@@ -193,6 +207,12 @@ class FeaturePipeline:
             vals = df[col].astype(int).values.reshape(-1, 1).astype(np.float32)
             parts.append(vals)
 
+        # Semantic similarity features
+        if self.config.include_semantic_similarity and self._similarity_encoder is not None:
+            sim_parts = self._compute_similarity_features(df)
+            if sim_parts is not None:
+                parts.append(sim_parts)
+
         if not parts:
             raise ValueError("No features to encode — check column names")
 
@@ -245,3 +265,29 @@ class FeaturePipeline:
             raise RuntimeError(
                 "FeaturePipeline has not been fitted. Call .fit_transform() first."
             )
+
+    def _compute_similarity_features(self, df: pd.DataFrame) -> np.ndarray | None:
+        """Compute semantic similarity features using e5-small-v2.
+
+        Returns an array of shape ``(n_samples, n_pairs)`` or ``None``
+        if no valid pairs found.
+        """
+        if self._similarity_encoder is None:
+            self._similarity_encoder = SemanticSimilarityEncoder(
+                model_name=self.config.similarity_model,
+            )
+
+        sim_cols: list[np.ndarray] = []
+
+        for col_a, col_b, feature_name in _SIMILARITY_PAIRS:
+            if col_a not in df.columns or col_b not in df.columns:
+                continue
+            texts_a = df[col_a].fillna("").astype(str).tolist()
+            texts_b = df[col_b].fillna("").astype(str).tolist()
+            sims = self._similarity_encoder.compute_similarity(texts_a, texts_b)
+            sim_cols.append(sims.reshape(-1, 1))
+            log.debug(f"Similarity '{feature_name}': mean={sims.mean():.3f}")
+
+        if sim_cols:
+            return np.hstack(sim_cols).astype(np.float32)
+        return None
