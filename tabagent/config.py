@@ -55,6 +55,8 @@ class FeaturesConfig(BaseModel):
     )
     include_state_features: bool = True
     include_dependency_features: bool = True
+    include_semantic_similarity: bool = False
+    similarity_model: str = "intfloat/e5-small-v2"
 
 
 class NegativeSamplingConfig(BaseModel):

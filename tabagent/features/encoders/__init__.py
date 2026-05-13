@@ -18,6 +18,7 @@ import numpy as np
 
 from tabagent.features.encoders.tfidf import TfidfEncoder
 from tabagent.features.encoders.dense import DenseEncoder
+from tabagent.features.encoders.similarity import SemanticSimilarityEncoder
 from tabagent.utils.logging import get_logger
 
 log = get_logger(__name__)
@@ -93,5 +94,6 @@ __all__ = [
     "TextEncoder",
     "TfidfEncoder",
     "DenseEncoder",
+    "SemanticSimilarityEncoder",
     "create_encoder",
 ]
