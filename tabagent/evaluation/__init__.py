@@ -9,8 +9,10 @@ from tabagent.evaluation.metrics import (
     recall_at_k,
     step_wise_accuracy,
 )
+from tabagent.evaluation.threshold_tuner import ThresholdTuner
 
 __all__ = [
+    "ThresholdTuner",
     "compute_metrics",
     "format_metrics",
     "metrics_by_group",

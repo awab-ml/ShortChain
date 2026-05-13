@@ -36,6 +36,7 @@ from tabagent.evaluation.metrics import (
     metrics_by_group,
     step_wise_accuracy,
 )
+from tabagent.evaluation.threshold_tuner import ThresholdTuner
 from tabagent.head.trainer import Trainer
 from tabagent.ingest.toolbench_catalog import ToolBenchCatalog
 from tabagent.ingest.toolbench_loader import ToolBenchLoader
@@ -253,6 +254,36 @@ def main() -> None:
                         f"R-P: {row.get('r_precision', 0):.3f}  "
                         f"n={int(row['n_samples'])}"
                     )
+
+    # Threshold sweep
+    log.info("")
+    log.info("[bold]Threshold Sweep:[/bold]")
+    tuner = ThresholdTuner(
+        thresholds=cfg.evaluation.sweep_thresholds,
+        target_metric=cfg.evaluation.threshold_target_metric,
+    )
+    best_t, sweep_results = tuner.find_optimal(y_test, y_proba)
+
+    for t in sorted(sweep_results):
+        r = sweep_results[t]
+        marker = " ◀ best" if t == best_t else ""
+        log.info(
+            f"  t={t:.2f}: F1={r['f1']:.4f}  "
+            f"P={r['precision']:.4f}  R={r['recall']:.4f}{marker}"
+        )
+
+    # Re-compute full metrics at optimal threshold
+    if best_t != 0.5:
+        log.info("")
+        log.info(f"[bold]Results at optimal threshold ({best_t:.2f}):[/bold]")
+        metrics_opt = compute_metrics(
+            y_test, y_proba, X_val=test_df,
+            k_values=cfg.evaluation.k_values, threshold=best_t,
+        )
+        log.info(format_metrics(metrics_opt))
+        # Store both in results
+        metrics["optimal_threshold"] = best_t
+        metrics["metrics_at_optimal"] = metrics_opt
 
     # ------------------------------------------------------------------
     # 8. Save results

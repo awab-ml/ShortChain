@@ -171,6 +171,10 @@ class EvaluationConfig(BaseModel):
             "f1",
         ]
     )
+    sweep_thresholds: list[float] = Field(
+        default_factory=lambda: [0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50]
+    )
+    threshold_target_metric: str = "f1"
 
 
 # ---------------------------------------------------------------------------
