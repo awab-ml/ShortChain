@@ -28,6 +28,8 @@ features:
   tfidf_max_features: 10000
   include_state_features: true
   include_dependency_features: true
+  include_semantic_similarity: true
+  similarity_model: "intfloat/e5-small-v2"
 
 negatives:
   strategy: "hard"              # Critical for same-category confusion
