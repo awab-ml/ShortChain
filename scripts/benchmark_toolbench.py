@@ -153,6 +153,7 @@ def main() -> None:
         features_config=cfg.features,
         negatives_config=cfg.negatives,
         tool_catalog=catalog.catalog,
+        category_map=catalog.category_map,
     )
     df = builder.build(trajectories)
     log.info(f"  Dataset: {len(df):,} rows")

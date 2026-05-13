@@ -1,0 +1,75 @@
+# ToolBench G3 (Cross-Category Multi-Tool) Benchmark Configuration
+# =================================================================
+# Optimised for cross-category multi-tool scenarios where tools span
+# 2-5 different categories. Uses step-level expansion, hybrid failure
+# negatives, and category-aware features with one-hot encoding.
+#
+# Usage:
+#   python scripts/benchmark_toolbench.py --config configs/toolbench_g3.yaml
+
+toolbench:
+  scenario: "G3"
+  granularity: "api"
+  use_preprocessed: true
+  data_dir: "data/toolbench"
+  toolenv_dir: "data/toolbench/data/toolenv/tools"
+  train_file: "data/toolbench/data/toolllama_G123_dfs_train.json"
+  eval_file: "data/toolbench/data/toolllama_G123_dfs_eval.json"
+
+  # G3-specific (same as G2 — step-level + hybrid negatives)
+  step_level: true
+  use_failure_negatives: true
+  failure_negative_ratio: 0.3
+
+ingest:
+  success_only: false           # Load failures too (for hard negatives)
+
+features:
+  text_encoder: "tfidf"
+  tfidf_max_features: 10000
+  include_state_features: true
+  include_dependency_features: true
+
+negatives:
+  strategy: "hard"
+  hard_negative_ratio: 0.7
+  same_app_weight: 0.3          # Lower — tools come from DIFFERENT categories
+  co_usage_weight: 0.4          # Higher — cross-category co-usage matters more
+  similarity_weight: 0.3
+
+dataset:
+  negative_ratio: 5             # Fewer available tools → fewer negatives needed
+
+classifier:
+  model_type: "xgboost"
+  xgboost:
+    n_estimators: 600
+    max_depth: 10
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_weight: 5
+    scale_pos_weight: 3
+    eval_metric: "logloss"
+    early_stopping_rounds: 40
+
+splitter:
+  n_folds: 5
+  test_size: 0.2
+  group_by: "task_id"
+  stratify_by:
+    - "app_name"
+
+inference:
+  top_k: 5
+  confidence_threshold: 0.5
+
+evaluation:
+  k_values: [1, 3, 5, 7, 10]
+  metrics:
+    - "r_precision"
+    - "recall_at_k"
+    - "pass_rate"
+    - "step_wise_accuracy"
+    - "accuracy"
+    - "f1"

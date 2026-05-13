@@ -27,6 +27,8 @@ class ContextFeatureBuilder:
         Whether to include state-aware features (step_index, last_action, etc.).
     include_dependencies
         Whether to include dependency features (tool_diversity, etc.).
+    category_map
+        Optional ``{api_key: category}`` mapping for category-aware features.
     """
 
     def __init__(
@@ -34,10 +36,12 @@ class ContextFeatureBuilder:
         corpus_stats: CorpusStats | None = None,
         include_state: bool = True,
         include_dependencies: bool = True,
+        category_map: dict[str, str] | None = None,
     ) -> None:
         self.corpus_stats = corpus_stats
         self.include_state = include_state
         self.include_dependencies = include_dependencies
+        self.category_map = category_map or {}
 
     def build(self, traj: Any, step_index: int | None = None) -> dict[str, Any]:
         """Extract context features from a trajectory.
@@ -76,6 +80,23 @@ class ContextFeatureBuilder:
             features["previous_tools"] = " | ".join(tool_seq)
             last = steps_so_far[-1] if steps_so_far else None
             features["last_thought"] = (last.thoughts or "") if last else ""
+
+        # --- Available-tool & category features (G2/G3) ---
+        available_tools = traj.metadata.get("available_tools", [])
+        features["available_tool_count"] = len(available_tools)
+
+        if self.category_map and available_tools:
+            cats = sorted(set(
+                self.category_map.get(t, "unknown")
+                for t in available_tools
+            ))
+            features["n_categories"] = len(cats)
+        else:
+            features["n_categories"] = 0
+
+        # --- Step-history: previous tool categories ---
+        if self.category_map:
+            features.update(self._step_history_features(traj, step_index))
 
         # --- State features ---
         if self.include_state:
@@ -142,6 +163,36 @@ class ContextFeatureBuilder:
             )
         else:
             features["app_tool_count"] = 0
+
+        return features
+
+    def _step_history_features(
+        self, traj: Any, step_index: int | None
+    ) -> dict[str, Any]:
+        """Build step-history features tracking previous tool categories.
+
+        For each prior step, records which category the tool belonged to.
+        This helps G3 models learn cross-category orchestration patterns.
+        """
+        features: dict[str, Any] = {}
+
+        if step_index is None:
+            tool_seq = traj.tool_sequence
+        else:
+            tool_seq = [
+                s.tool_name for s in traj.steps[: step_index + 1]
+                if s.tool_name
+            ]
+
+        # Map each previous tool to its category
+        prev_categories = [
+            self.category_map.get(t, "unknown") for t in tool_seq
+        ]
+        features["previous_tool_categories"] = " | ".join(prev_categories)
+        features["n_prev_categories_used"] = len(set(prev_categories)) if prev_categories else 0
+        features["prev_categories_repeat"] = (
+            1 if len(prev_categories) != len(set(prev_categories)) else 0
+        )
 
         return features
 

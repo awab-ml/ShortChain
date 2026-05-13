@@ -60,6 +60,9 @@ class ToolFeatureBuilder:
         features["tool_name_length"] = len(tool_name)
         features["has_description"] = bool(meta.get("description"))
 
+        # --- Category feature (for G3 one-hot encoding) ---
+        features["tool_category"] = meta.get("category", "unknown")
+
         # --- Context cross-features ---
         if context:
             features["tool_app_match"] = self._app_match(tool_name, context)

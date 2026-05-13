@@ -54,11 +54,13 @@ class DatasetBuilder:
         features_config: FeaturesConfig | None = None,
         negatives_config: NegativeSamplingConfig | None = None,
         tool_catalog: dict[str, str] | None = None,
+        category_map: dict[str, str] | None = None,
     ) -> None:
         self.config = config or DatasetConfig()
         self.features_config = features_config or FeaturesConfig()
         self.negatives_config = negatives_config or NegativeSamplingConfig()
         self._explicit_catalog = tool_catalog
+        self._category_map = category_map or {}
         self._corpus_stats: CorpusStats | None = None
 
     # ------------------------------------------------------------------
@@ -84,6 +86,7 @@ class DatasetBuilder:
             corpus_stats=self._corpus_stats,
             include_state=self.features_config.include_state_features,
             include_dependencies=self.features_config.include_dependency_features,
+            category_map=self._category_map,
         )
         tool_builder = ToolFeatureBuilder(corpus_stats=self._corpus_stats)
 
@@ -154,7 +157,10 @@ class DatasetBuilder:
         for tool_name in traj.tools_used:
             tool_features = tool_builder.build(
                 tool_name,
-                tool_meta={"description": catalog.get(tool_name, "")},
+                tool_meta={
+                    "description": catalog.get(tool_name, ""),
+                    "category": self._category_map.get(tool_name, "unknown"),
+                },
                 context=context,
             )
             row = {**context, **tool_features, "label": 1}
@@ -191,7 +197,10 @@ class DatasetBuilder:
         for tool_name in negative_tools:
             tool_features = tool_builder.build(
                 tool_name,
-                tool_meta={"description": catalog.get(tool_name, "")},
+                tool_meta={
+                    "description": catalog.get(tool_name, ""),
+                    "category": self._category_map.get(tool_name, "unknown"),
+                },
                 context=context,
             )
             row = {**context, **tool_features, "label": 0}
@@ -210,6 +219,7 @@ def build_dataset(
     features_config: FeaturesConfig | None = None,
     negatives_config: NegativeSamplingConfig | None = None,
     tool_catalog: dict[str, str] | None = None,
+    category_map: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Build a training dataset from trajectories (convenience wrapper)."""
     builder = DatasetBuilder(
@@ -217,5 +227,6 @@ def build_dataset(
         features_config=features_config,
         negatives_config=negatives_config,
         tool_catalog=tool_catalog,
+        category_map=category_map,
     )
     return builder.build(trajectories)
