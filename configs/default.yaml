@@ -85,3 +85,9 @@ evaluation:
     - "recall_at_k"
     - "accuracy"
     - "f1"
+
+benchmark:
+  adapter: "toolbench"                  # adapter name from registry
+  step_level: false                     # expand trajectories to per-step samples
+  use_failure_negatives: false          # augment training with failure negatives
+  failure_negative_ratio: 0.3           # fraction of failure rows to inject

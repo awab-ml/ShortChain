@@ -154,6 +154,21 @@ class EvaluationConfig(BaseModel):
     )
 
 
+class BenchmarkConfig(BaseModel):
+    """Benchmark adapter settings.
+
+    Controls dataset-agnostic benchmark behaviour.  The ``adapter`` field
+    selects which ``BenchmarkAdapter`` to use; per-adapter options (e.g.,
+    ToolBench-specific paths) are passed at construction time or via the
+    adapter's own config section.
+    """
+
+    adapter: str = "toolbench"               # adapter name from registry
+    step_level: bool = False                  # expand trajectories to per-step samples
+    use_failure_negatives: bool = False       # augment training with failure negatives
+    failure_negative_ratio: float = 0.3       # fraction of failure rows to inject
+
+
 # ---------------------------------------------------------------------------
 # Root config
 # ---------------------------------------------------------------------------
@@ -169,6 +184,7 @@ class TabAgentConfig(BaseModel):
     classifier: ClassifierConfig = Field(default_factory=ClassifierConfig)
     inference: InferenceConfig = Field(default_factory=InferenceConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
+    benchmark: BenchmarkConfig = Field(default_factory=BenchmarkConfig)
 
 
 # ---------------------------------------------------------------------------
