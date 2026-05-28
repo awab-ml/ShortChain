@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import unittest
 
-from tabagent.config import NegativeSamplingConfig
-from tabagent.dataset.negatives import (
+from shortchain.config import NegativeSamplingConfig
+from shortchain.dataset.negatives import (
     RandomSampler,
     HardNegativeSampler,
     MixedSampler,
     create_sampler,
 )
-from tabagent.features.stats import CorpusStats
-from tabagent.ingest.schema import Step, Trajectory
+from shortchain.features.stats import CorpusStats
+from shortchain.ingest.schema import Step, Trajectory
 
 
 # ---------------------------------------------------------------------------

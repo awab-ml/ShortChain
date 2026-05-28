@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tabagent.evaluation.metrics import (
+from shortchain.evaluation.metrics import (
     compute_metrics,
     r_precision,
     recall_at_k,

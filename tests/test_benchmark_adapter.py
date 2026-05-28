@@ -1,11 +1,11 @@
 """Tests for the benchmark adapter architecture.
 
 Covers:
-- Core ``expand_to_step_trajectories`` transform (Q1: lives in tabagent.data)
+- Core ``expand_to_step_trajectories`` transform (Q1: lives in shortchain.data)
 - ``BenchmarkAdapter`` protocol compliance
 - ``ToolBenchAdapter`` construction and data flow
 - Adapter registry (``create_adapter``, ``list_adapters``)
-- ``BenchmarkConfig`` in ``TabAgentConfig``
+- ``BenchmarkConfig`` in ``ShortChainConfig``
 """
 
 from __future__ import annotations
@@ -17,12 +17,12 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from tabagent.benchmarks import create_adapter, list_adapters, ADAPTERS
-from tabagent.benchmarks.adapter import BenchmarkAdapter
-from tabagent.benchmarks.toolbench import ToolBenchAdapter
-from tabagent.config import BenchmarkConfig, TabAgentConfig, load_config
-from tabagent.data.transforms import expand_to_step_trajectories
-from tabagent.ingest.schema import Step, Trajectory
+from shortchain.benchmarks import create_adapter, list_adapters, ADAPTERS
+from shortchain.benchmarks.adapter import BenchmarkAdapter
+from shortchain.benchmarks.toolbench import ToolBenchAdapter
+from shortchain.config import BenchmarkConfig, ShortChainConfig, load_config
+from shortchain.data.transforms import expand_to_step_trajectories
+from shortchain.ingest.schema import Step, Trajectory
 
 
 # ---------------------------------------------------------------------------
@@ -285,23 +285,23 @@ class TestAdapterRegistry:
         assert adapters == sorted(adapters)
 
     def test_create_adapter_toolbench(self):
-        cfg = TabAgentConfig()
+        cfg = ShortChainConfig()
         adapter = create_adapter("toolbench", cfg)
         assert adapter.name == "toolbench"
         assert isinstance(adapter, BenchmarkAdapter)
 
     def test_create_adapter_case_insensitive(self):
-        cfg = TabAgentConfig()
+        cfg = ShortChainConfig()
         adapter = create_adapter("ToolBench", cfg)
         assert adapter.name == "toolbench"
 
     def test_create_adapter_unknown_raises(self):
-        cfg = TabAgentConfig()
+        cfg = ShortChainConfig()
         with pytest.raises(ValueError, match="Unknown benchmark adapter"):
             create_adapter("nonexistent", cfg)
 
     def test_create_adapter_with_kwargs(self, tmp_path):
-        cfg = TabAgentConfig()
+        cfg = ShortChainConfig()
         adapter = create_adapter(
             "toolbench",
             cfg,
@@ -316,10 +316,10 @@ class TestAdapterRegistry:
 # ---------------------------------------------------------------------------
 
 class TestBenchmarkConfig:
-    """Tests for the BenchmarkConfig in TabAgentConfig."""
+    """Tests for the BenchmarkConfig in ShortChainConfig."""
 
     def test_default_benchmark_config(self):
-        cfg = TabAgentConfig()
+        cfg = ShortChainConfig()
         assert cfg.benchmark.adapter == "toolbench"
         assert cfg.benchmark.step_level is False
         assert cfg.benchmark.use_failure_negatives is False
@@ -342,7 +342,7 @@ benchmark:
 
     def test_backward_compatibility(self):
         """Existing config fields are unchanged."""
-        cfg = TabAgentConfig()
+        cfg = ShortChainConfig()
         # All pre-existing fields still accessible
         assert cfg.ingest is not None
         assert cfg.features is not None

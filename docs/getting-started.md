@@ -9,8 +9,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/awab-ml/TabAgent.git
-cd TabAgent
+git clone https://github.com/awab-ml/ShortChain.git
+cd ShortChain
 
 # Install with development dependencies
 pip install -e ".[dev]"
@@ -30,11 +30,11 @@ python scripts/build_dataset.py \
 # 2. Train classifier with cross-validation
 python scripts/train.py \
     --dataset data/datasets/ \
-    --output models/tabagent.pkl
+    --output models/shortchain.pkl
 
 # 3. Evaluate on test set
 python scripts/evaluate.py \
-    --model models/tabagent.pkl \
+    --model models/shortchain.pkl \
     --dataset data/datasets/test.csv
 ```
 
@@ -58,7 +58,7 @@ The `train.py` script:
 2. **Ran k-fold cross-validation** (default 5 folds) with group-stratified splits
 3. **Trained** an XGBoost classifier using `FeaturePipeline` to encode text (TF-IDF), categorical (label encoding), and numeric features
 4. **Trained a final model** on all training data
-5. **Saved** the model to `models/tabagent.pkl` and CV results to `models/cv_results.json`
+5. **Saved** the model to `models/shortchain.pkl` and CV results to `models/cv_results.json`
 
 ### Step 3: Evaluate
 
@@ -88,7 +88,7 @@ Evaluation Results:
 
 ### Trajectory Format
 
-TabAgent reads JSON or JSONL files. Each record represents one agent execution:
+ShortChain reads JSON or JSONL files. Each record represents one agent execution:
 
 ```json
 {
@@ -144,7 +144,7 @@ If your logs use different field names, map them in YAML:
 # my_config.yaml
 ingest:
   field_map:
-    task_id: "id"             # your field → TabAgent field
+    task_id: "id"             # your field → ShortChain field
     intent: "instruction"
     steps: "actions"
     success: "completed"
@@ -162,11 +162,11 @@ python scripts/build_dataset.py \
 
 ### Providing a Tool Catalog
 
-By default, TabAgent derives the tool catalog from the trajectories (every tool name that appears becomes a catalog entry). For better negative sampling and features, provide explicit tool descriptions:
+By default, ShortChain derives the tool catalog from the trajectories (every tool name that appears becomes a catalog entry). For better negative sampling and features, provide explicit tool descriptions:
 
 ```python
-from tabagent.dataset.builder import DatasetBuilder
-from tabagent.ingest.loader import load_trajectories
+from shortchain.dataset.builder import DatasetBuilder
+from shortchain.ingest.loader import load_trajectories
 
 trajectories = load_trajectories("path/to/logs/")
 

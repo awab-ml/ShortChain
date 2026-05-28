@@ -14,13 +14,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from tabagent.config import FeaturesConfig
-from tabagent.features.context import ContextFeatureBuilder
-from tabagent.features.encoders import TfidfEncoder, DenseEncoder, create_encoder
-from tabagent.features.pipeline import FeaturePipeline
-from tabagent.features.stats import CorpusStats
-from tabagent.features.tool import ToolFeatureBuilder
-from tabagent.ingest.schema import Step, Trajectory
+from shortchain.config import FeaturesConfig
+from shortchain.features.context import ContextFeatureBuilder
+from shortchain.features.encoders import TfidfEncoder, DenseEncoder, create_encoder
+from shortchain.features.pipeline import FeaturePipeline
+from shortchain.features.stats import CorpusStats
+from shortchain.features.tool import ToolFeatureBuilder
+from shortchain.ingest.schema import Step, Trajectory
 
 
 # ---------------------------------------------------------------------------

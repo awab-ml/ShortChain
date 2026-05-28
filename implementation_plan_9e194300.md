@@ -1,8 +1,8 @@
-# TabAgent: Final Implementation Plan (MVP — Phase 1)
+# ShortChain: Final Implementation Plan (MVP — Phase 1)
 
 ## Philosophy
 
-> **TabAgent is an optimization layer that evolves on top of an existing agentic system.**
+> **ShortChain is an optimization layer that evolves on top of an existing agentic system.**
 > Start with a working classifier, validate the idea, then scale complexity.
 
 ---
@@ -10,12 +10,12 @@
 ## Project Structure
 
 ```
-tabagent/
+shortchain/
 ├── pyproject.toml
 ├── README.md
 ├── configs/
 │   └── default.yaml
-├── tabagent/
+├── shortchain/
 │   ├── __init__.py
 │   ├── config.py                     # Pydantic config models
 │   ├── ingest/                       # Trajectory ingestion

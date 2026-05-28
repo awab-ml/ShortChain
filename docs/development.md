@@ -4,8 +4,8 @@
 
 ```bash
 # Clone and install in development mode
-git clone https://github.com/awab-ml/TabAgent.git
-cd TabAgent
+git clone https://github.com/awab-ml/ShortChain.git
+cd ShortChain
 pip install -e ".[dev]"
 
 # Optional: dense embeddings
@@ -55,7 +55,7 @@ pytest tests/test_metrics.py -v
 pytest tests/test_features.py::TestContextFeatureBuilder::test_build_basic -v
 
 # With coverage
-pytest tests/ --cov=tabagent --cov-report=term-missing
+pytest tests/ --cov=shortchain --cov-report=term-missing
 ```
 
 ### Test Structure
@@ -83,7 +83,7 @@ tests/
 ```python
 # tests/test_my_module.py
 import pytest
-from tabagent.ingest.schema import Step, Trajectory
+from shortchain.ingest.schema import Step, Trajectory
 
 
 def _make_trajectory(**overrides) -> Trajectory:
@@ -118,10 +118,10 @@ class TestMyFeature:
 
 ```bash
 # Check style
-ruff check tabagent/ tests/
+ruff check shortchain/ tests/
 
 # Auto-fix
-ruff check --fix tabagent/ tests/
+ruff check --fix shortchain/ tests/
 ```
 
 Configuration is in `pyproject.toml`:
@@ -141,19 +141,19 @@ To add a new feature to the pipeline:
 
 **Context feature** (depends on trajectory state):
 ```python
-# tabagent/features/context.py → ContextFeatureBuilder.build()
+# shortchain/features/context.py → ContextFeatureBuilder.build()
 features["my_new_feature"] = self._compute_my_feature(traj)
 ```
 
 **Tool feature** (depends on the candidate tool):
 ```python
-# tabagent/features/tool.py → ToolFeatureBuilder.build()
+# shortchain/features/tool.py → ToolFeatureBuilder.build()
 features["my_tool_feature"] = self._compute_tool_feature(tool_name)
 ```
 
 ### 2. Register in the pipeline
 
-Add the column name to the appropriate list in `tabagent/features/pipeline.py`:
+Add the column name to the appropriate list in `shortchain/features/pipeline.py`:
 
 ```python
 # For numeric features:
@@ -196,7 +196,7 @@ features:
 ### 1. Add config model
 
 ```python
-# tabagent/config.py
+# shortchain/config.py
 class MyModelParams(BaseModel):
     n_estimators: int = 100
     # ...
@@ -209,7 +209,7 @@ class ClassifierConfig(BaseModel):
 ### 2. Add to the model factory
 
 ```python
-# tabagent/head/classifier.py → _create_model()
+# shortchain/head/classifier.py → _create_model()
 elif model_type == "my_model":
     from my_library import MyClassifier
     return MyClassifier(**self.config.my_model.model_dump())
@@ -232,7 +232,7 @@ classifier:
 ### 1. Create the sampler class
 
 ```python
-# tabagent/dataset/negatives.py
+# shortchain/dataset/negatives.py
 class MyCustomSampler(NegativeSampler):
     def sample(self, positive_tools, app_name, n):
         pool = [t for t in self.catalog if t not in positive_tools]
@@ -243,7 +243,7 @@ class MyCustomSampler(NegativeSampler):
 ### 2. Register in the factory
 
 ```python
-# tabagent/dataset/negatives.py → create_sampler()
+# shortchain/dataset/negatives.py → create_sampler()
 elif strategy == "my_custom":
     return MyCustomSampler(catalog, corpus_stats, config.random_state)
 ```
@@ -267,8 +267,8 @@ class TestMyCustomSampler:
 ### 1. Create a loader class
 
 ```python
-# tabagent/ingest/my_format.py
-from tabagent.ingest.base import TrajectoryLoader
+# shortchain/ingest/my_format.py
+from shortchain.ingest.base import TrajectoryLoader
 
 class CSVTrajectoryLoader(TrajectoryLoader):
     def load(self, path: str | Path) -> list[Trajectory]:
@@ -279,8 +279,8 @@ class CSVTrajectoryLoader(TrajectoryLoader):
 ### 2. Register in the loader module
 
 ```python
-# tabagent/ingest/__init__.py
-from tabagent.ingest.my_format import CSVTrajectoryLoader
+# shortchain/ingest/__init__.py
+from shortchain.ingest.my_format import CSVTrajectoryLoader
 ```
 
 ---
@@ -300,11 +300,11 @@ python scripts/train.py \
     --dataset data/datasets/ \
     --model xgboost \
     --folds 3 \
-    --output models/tabagent.pkl
+    --output models/shortchain.pkl
 
 # Evaluate
 python scripts/evaluate.py \
-    --model models/tabagent.pkl \
+    --model models/shortchain.pkl \
     --dataset data/datasets/test.csv \
     --output models/eval_results.json
 ```
@@ -315,7 +315,7 @@ Expected: all commands succeed, R-Precision ≥ 0.85, Recall@5 = 1.0 on example 
 
 ## Versioning and Releases
 
-- **Package version**: defined in `pyproject.toml` and `tabagent/__init__.py`
+- **Package version**: defined in `pyproject.toml` and `shortchain/__init__.py`
 - **Model format version**: `v2` (Phase 2). Stored in pickle alongside the model.
 - **Backward compatibility**: v1 models (Phase 1) are loaded via the legacy adapter in `classifier.py`
 

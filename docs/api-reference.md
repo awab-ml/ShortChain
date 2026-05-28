@@ -5,7 +5,7 @@
 ### `Step`
 
 ```python
-from tabagent.ingest.schema import Step
+from shortchain.ingest.schema import Step
 
 step = Step(
     agent_name="CoderAgent",
@@ -31,7 +31,7 @@ step.tool_name   # "send_email" — auto-extracted from action
 ### `Trajectory`
 
 ```python
-from tabagent.ingest.schema import Trajectory
+from shortchain.ingest.schema import Trajectory
 
 traj = Trajectory(
     task_id="task_001",
@@ -65,7 +65,7 @@ traj.summary()      # {"task_id": "task_001", "intent": "Send an email...", ...}
 ### `load_trajectories()`
 
 ```python
-from tabagent.ingest.loader import load_trajectories
+from shortchain.ingest.loader import load_trajectories
 
 # Load from directory (reads all .json/.jsonl files)
 trajs = load_trajectories("data/example/")
@@ -74,7 +74,7 @@ trajs = load_trajectories("data/example/")
 trajs = load_trajectories("data/example/trajectories.jsonl")
 
 # With custom config
-from tabagent.config import IngestConfig
+from shortchain.config import IngestConfig
 trajs = load_trajectories("logs/", config=IngestConfig(success_only=False))
 ```
 
@@ -85,7 +85,7 @@ trajs = load_trajectories("logs/", config=IngestConfig(success_only=False))
 ### `CorpusStats`
 
 ```python
-from tabagent.features.stats import CorpusStats
+from shortchain.features.stats import CorpusStats
 
 stats = CorpusStats.from_trajectories(trajectories)
 
@@ -105,7 +105,7 @@ stats.get_tool_freq("send_email")          # 5
 ### `ContextFeatureBuilder`
 
 ```python
-from tabagent.features.context import ContextFeatureBuilder
+from shortchain.features.context import ContextFeatureBuilder
 
 builder = ContextFeatureBuilder(
     corpus_stats=stats,          # Optional
@@ -128,7 +128,7 @@ features = builder.build(traj, step_index=2)
 ### `ToolFeatureBuilder`
 
 ```python
-from tabagent.features.tool import ToolFeatureBuilder
+from shortchain.features.tool import ToolFeatureBuilder
 
 builder = ToolFeatureBuilder(corpus_stats=stats)
 
@@ -148,8 +148,8 @@ features = builder.build(
 ### `FeaturePipeline`
 
 ```python
-from tabagent.features.pipeline import FeaturePipeline
-from tabagent.config import FeaturesConfig
+from shortchain.features.pipeline import FeaturePipeline
+from shortchain.config import FeaturesConfig
 
 pipeline = FeaturePipeline(config=FeaturesConfig())
 
@@ -172,7 +172,7 @@ pipeline = FeaturePipeline.load("models/pipeline.pkl")
 ### `DatasetBuilder`
 
 ```python
-from tabagent.dataset.builder import DatasetBuilder, build_dataset
+from shortchain.dataset.builder import DatasetBuilder, build_dataset
 
 # Full control
 builder = DatasetBuilder(
@@ -221,8 +221,8 @@ builder.corpus_stats  # CorpusStats object
 ### `NegativeSampler`
 
 ```python
-from tabagent.dataset.negatives import create_sampler
-from tabagent.config import NegativeSamplingConfig
+from shortchain.dataset.negatives import create_sampler
+from shortchain.config import NegativeSamplingConfig
 
 sampler = create_sampler(
     config=NegativeSamplingConfig(strategy="hard"),
@@ -243,8 +243,8 @@ negatives = sampler.sample(
 ### `GroupStratifiedSplitter`
 
 ```python
-from tabagent.dataset.splitter import GroupStratifiedSplitter
-from tabagent.config import SplitterConfig
+from shortchain.dataset.splitter import GroupStratifiedSplitter
+from shortchain.config import SplitterConfig
 
 splitter = GroupStratifiedSplitter(SplitterConfig(n_folds=5, test_size=0.2))
 
@@ -261,13 +261,13 @@ for train_fold, val_fold in splitter.kfold_split(df):
 
 ## Classifier
 
-### `TabAgentClassifier`
+### `ShortChainClassifier`
 
 ```python
-from tabagent.head.classifier import TabAgentClassifier
-from tabagent.config import ClassifierConfig
+from shortchain.head.classifier import ShortChainClassifier
+from shortchain.config import ClassifierConfig
 
-clf = TabAgentClassifier(ClassifierConfig(model_type="xgboost"))
+clf = ShortChainClassifier(ClassifierConfig(model_type="xgboost"))
 
 # Train
 clf.fit(X_train, y_train)                    # X is raw DataFrame
@@ -278,8 +278,8 @@ preds = clf.predict(X_test)                  # np.ndarray, binary
 shortlists = clf.shortlist(X_test, top_k=5)  # list of (tool, score) per task
 
 # Persistence
-clf.save("models/tabagent.pkl")
-clf = TabAgentClassifier.load("models/tabagent.pkl")  # Supports v1 and v2
+clf.save("models/shortchain.pkl")
+clf = ShortChainClassifier.load("models/shortchain.pkl")  # Supports v1 and v2
 ```
 
 ---
@@ -287,10 +287,10 @@ clf = TabAgentClassifier.load("models/tabagent.pkl")  # Supports v1 and v2
 ### `InferenceEngine`
 
 ```python
-from tabagent.head.inference import InferenceEngine
+from shortchain.head.inference import InferenceEngine
 
 # Load from disk
-engine = InferenceEngine(model_path="models/tabagent.pkl", top_k=5)
+engine = InferenceEngine(model_path="models/shortchain.pkl", top_k=5)
 
 # Or from an existing classifier
 engine = InferenceEngine(classifier=clf, top_k=5)
@@ -323,7 +323,7 @@ results = engine.predict_batch(test_df, top_k=5)
 ### `Trainer`
 
 ```python
-from tabagent.head.trainer import Trainer
+from shortchain.head.trainer import Trainer
 
 trainer = Trainer(
     classifier_config=ClassifierConfig(),
@@ -336,7 +336,7 @@ cv_results = trainer.train_with_cv(train_df)
 # Returns: {"fold_metrics": [...], "aggregate": {"r_precision": 0.87, ...}}
 
 # Final model
-clf = trainer.train_final(train_df, save_path="models/tabagent.pkl")
+clf = trainer.train_final(train_df, save_path="models/shortchain.pkl")
 ```
 
 ---
@@ -346,7 +346,7 @@ clf = trainer.train_final(train_df, save_path="models/tabagent.pkl")
 ### `compute_metrics()`
 
 ```python
-from tabagent.evaluation.metrics import compute_metrics, format_metrics
+from shortchain.evaluation.metrics import compute_metrics, format_metrics
 
 metrics = compute_metrics(
     y_true=y_test,                     # np.ndarray, binary labels

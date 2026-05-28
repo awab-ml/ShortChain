@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train a TabAgent classifier.
+"""Train a ShortChain classifier.
 
 Usage::
 
@@ -7,7 +7,7 @@ Usage::
         --dataset data/datasets/ \\
         --model xgboost \\
         --folds 5 \\
-        --output models/tabagent.pkl
+        --output models/shortchain.pkl
 """
 
 from __future__ import annotations
@@ -17,16 +17,16 @@ from pathlib import Path
 
 import pandas as pd
 
-from tabagent.config import load_config
-from tabagent.head.trainer import Trainer
-from tabagent.utils.io import ensure_dir, write_json
-from tabagent.utils.logging import get_logger
+from shortchain.config import load_config
+from shortchain.head.trainer import Trainer
+from shortchain.utils.io import ensure_dir, write_json
+from shortchain.utils.logging import get_logger
 
 log = get_logger(__name__)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train a TabAgent classifier.")
+    parser = argparse.ArgumentParser(description="Train a ShortChain classifier.")
     parser.add_argument(
         "--dataset",
         type=str,
@@ -48,7 +48,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=str,
-        default="models/tabagent.pkl",
+        default="models/shortchain.pkl",
         help="Path to save the trained model.",
     )
     parser.add_argument(

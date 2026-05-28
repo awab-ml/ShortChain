@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generic benchmark runner.
 
-Resolves a benchmark adapter by name and runs the full TabAgent pipeline:
+Resolves a benchmark adapter by name and runs the full ShortChain pipeline:
 ingest → build dataset → train (with CV) → evaluate.
 
 Usage::
@@ -26,20 +26,20 @@ import argparse
 import time
 from pathlib import Path
 
-from tabagent.benchmarks import create_adapter
-from tabagent.config import load_config
-from tabagent.dataset.builder import DatasetBuilder
-from tabagent.evaluation.metrics import compute_metrics, format_metrics
-from tabagent.head.trainer import Trainer
-from tabagent.utils.io import ensure_dir, write_json
-from tabagent.utils.logging import get_logger
+from shortchain.benchmarks import create_adapter
+from shortchain.config import load_config
+from shortchain.dataset.builder import DatasetBuilder
+from shortchain.evaluation.metrics import compute_metrics, format_metrics
+from shortchain.head.trainer import Trainer
+from shortchain.utils.io import ensure_dir, write_json
+from shortchain.utils.logging import get_logger
 
 log = get_logger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run a benchmark using the TabAgent adapter architecture.",
+        description="Run a benchmark using the ShortChain adapter architecture.",
     )
     parser.add_argument(
         "--benchmark",
@@ -90,7 +90,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=str,
-        default="models/tabagent.pkl",
+        default="models/shortchain.pkl",
         help="Path to save the trained model.",
     )
     parser.add_argument(

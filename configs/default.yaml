@@ -1,11 +1,11 @@
-# TabAgent Default Configuration
+# ShortChain Default Configuration
 # ================================
 # Override any setting via CLI flags or by creating a custom YAML config.
 
 ingest:
   format: "jsonl"                     # json | jsonl
   success_only: true                  # filter to successful trajectories
-  field_map:                          # map your log fields to TabAgent schema
+  field_map:                          # map your log fields to ShortChain schema
     task_id: "task_id"
     intent: "intent"
     steps: "steps"

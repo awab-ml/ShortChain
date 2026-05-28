@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from tabagent.ingest.schema import Step, Trajectory
-from tabagent.ingest.loader import JSONLTrajectoryLoader, load_trajectories
-from tabagent.config import IngestConfig
+from shortchain.ingest.schema import Step, Trajectory
+from shortchain.ingest.loader import JSONLTrajectoryLoader, load_trajectories
+from shortchain.config import IngestConfig
 
 
 # ---------------------------------------------------------------------------

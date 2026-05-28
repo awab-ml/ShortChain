@@ -1,1 +1,1 @@
-"""TabAgent test suite."""
+"""ShortChain test suite."""

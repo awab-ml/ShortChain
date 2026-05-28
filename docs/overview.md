@@ -8,7 +8,7 @@ But this is a **ranking problem**, not a generation problem. Given a fixed catal
 
 ## The Solution
 
-**TabAgent** trains a lightweight tabular classifier (~1ms inference) on the agent's own successful execution traces. At runtime, it replaces or augments LLM calls with a single forward pass through the classifier, achieving:
+**ShortChain** trains a lightweight tabular classifier (~1ms inference) on the agent's own successful execution traces. At runtime, it replaces or augments LLM calls with a single forward pass through the classifier, achieving:
 
 - **~95% latency reduction**: ~1ms vs ~500–2000ms per decision
 - **~85–91% cost reduction**: no API calls for tool selection
@@ -28,7 +28,7 @@ Current context + candidate tools → Classifier → Ranked shortlist (in ~1ms)
 
 ### Key Concept: Pointwise Reduction
 
-The paper's core technique transforms a **ranking** problem into **binary classification**:
+The core technique transforms a **ranking** problem into **binary classification**:
 
 For each trajectory (a successful agent execution):
 1. **Positive pairs** (label=1): For every tool the agent actually used, create a row `(context, tool_name, 1)`
@@ -38,9 +38,9 @@ The classifier learns to predict: *"Given this context, is this tool likely to b
 
 At inference time, score all candidate tools and return the top-K.
 
-## The Paper
+## Core Concepts
 
-TabAgent is based on [Levy et al., 2026](https://arxiv.org/abs/2602.16429). The paper introduces three components:
+ShortChain introduces three components:
 
 | Component | Description | Status in This Repo |
 |---|---|---|
@@ -48,9 +48,9 @@ TabAgent is based on [Levy et al., 2026](https://arxiv.org/abs/2602.16429). The 
 | **TabSynth** | Synthetic data generation for rare tool combinations | Planned (Phase 3B) |
 | **TabHead** | Lightweight classifier that replaces LLM decisions | ✅ Implemented |
 
-The paper reports results on the AppWorld benchmark (457 APIs across 9 apps), achieving ~95% latency reduction while maintaining task-level success.
+Results on the AppWorld benchmark (457 APIs across 9 apps), achieving ~95% latency reduction while maintaining task-level success.
 
-## When to Use TabAgent
+## When to Use ShortChain
 
 **Good fit:**
 - Your agent has a fixed or slowly-changing tool catalog

@@ -1,6 +1,6 @@
 # Configuration Reference
 
-TabAgent is fully configurable via YAML. All settings have sensible defaults in `configs/default.yaml`. Override any setting by creating a custom YAML file and passing it with `--config`:
+ShortChain is fully configurable via YAML. All settings have sensible defaults in `configs/default.yaml`. Override any setting by creating a custom YAML file and passing it with `--config`:
 
 ```bash
 python scripts/train.py --dataset data/datasets/ --config my_config.yaml
@@ -17,7 +17,7 @@ Custom configs are **deep-merged** on top of defaults — you only specify what 
 ingest:
   format: "jsonl"                     # "json" or "jsonl"
   success_only: true                  # Only use successful trajectories
-  field_map:                          # Map your log fields → TabAgent fields
+  field_map:                          # Map your log fields → ShortChain fields
     task_id: "task_id"
     intent: "intent"
     steps: "steps"
@@ -178,7 +178,7 @@ features:
 ## Loading Config in Python
 
 ```python
-from tabagent.config import load_config, TabAgentConfig
+from shortchain.config import load_config, ShortChainConfig
 
 # Load defaults
 cfg = load_config()
@@ -193,7 +193,7 @@ print(cfg.features.text_encoder)       # "tfidf"
 print(cfg.splitter.n_folds)            # 5
 
 # Create config programmatically
-from tabagent.config import ClassifierConfig, FeaturesConfig
+from shortchain.config import ClassifierConfig, FeaturesConfig
 
 clf_config = ClassifierConfig(model_type="random_forest")
 feat_config = FeaturesConfig(text_encoder="e5-small")

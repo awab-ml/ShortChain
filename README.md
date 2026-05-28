@@ -1,12 +1,12 @@
-# TabAgent
+# ShortChain
 
 > Replace expensive LLM decision components in agentic systems with compact tabular-textual classifiers.
 
-**TabAgent** is an optimization layer that learns from successful agent execution traces to train lightweight classifiers (~1ms inference) that replace or augment expensive LLM tool-selection decisions. Based on [Levy et al., 2026](https://arxiv.org/abs/2602.16429).
+**ShortChain** is an optimization layer that learns from successful agent execution traces to train lightweight classifiers (~1ms inference) that replace or augment expensive LLM tool-selection decisions.
 
-## Why TabAgent?
+## Why ShortChain?
 
-| | LLM Tool Selection | TabAgent |
+| | LLM Tool Selection | ShortChain |
 |---|---|---|
 | **Latency** | 500–2000ms per decision | ~1ms per decision |
 | **Cost** | $0.01–$0.10 per call | $0 (local inference) |
@@ -21,16 +21,16 @@ pip install -e ".[dev]"
 
 # Build dataset → Train → Evaluate (3 commands)
 python scripts/build_dataset.py --trajectories data/example/ --output data/datasets/
-python scripts/train.py --dataset data/datasets/ --output models/tabagent.pkl
-python scripts/evaluate.py --model models/tabagent.pkl --dataset data/datasets/test.csv
+python scripts/train.py --dataset data/datasets/ --output models/shortchain.pkl
+python scripts/evaluate.py --model models/shortchain.pkl --dataset data/datasets/test.csv
 ```
 
 ## Use in Your Agent
 
 ```python
-from tabagent.head.inference import InferenceEngine
+from shortchain.head.inference import InferenceEngine
 
-engine = InferenceEngine(model_path="models/tabagent.pkl", top_k=5)
+engine = InferenceEngine(model_path="models/shortchain.pkl", top_k=5)
 
 # At each agent decision point (~1ms):
 shortlist = engine.predict(
@@ -53,8 +53,8 @@ Trajectories → Ingestion → CorpusStats → DatasetBuilder → FeaturePipelin
 ## Project Structure
 
 ```
-TabAgent/
-├── tabagent/                    # Core package (2,920 lines)
+ShortChain/
+├── shortchain/                    # Core package (2,920 lines)
 │   ├── config.py                # 11 Pydantic config models
 │   ├── ingest/                  # Trajectory loading & normalization
 │   ├── features/                # Feature pipeline (encoders, context, tool, stats)
@@ -72,20 +72,20 @@ TabAgent/
 ## Key Features
 
 - **Agent-agnostic** — works with any agent that produces JSON execution logs
-- **Configurable field mapping** — map your log fields to TabAgent's schema via YAML
+- **Configurable field mapping** — map your log fields to ShortChain's schema via YAML
 - **Modular feature pipeline** — context, tool, and encoding stages via `FeaturePipeline`
 - **State-aware features** — step index, last action, history summary, tool diversity
 - **Pluggable negative sampling** — random, hard (same-app, co-usage, similarity), or mixed
 - **Hybrid text encoding** — TF-IDF (default) or E5-small dense embeddings
 - **Group-aware splits** — no task-level data leakage in train/test/CV
 - **Multiple backends** — XGBoost (default), Random Forest, Logistic Regression
-- **Paper-faithful metrics** — R-precision (P@R), Recall@k
+- **Faithful metrics** — R-precision (P@R), Recall@k
 
 ## Documentation
 
 | Document | Description |
 |---|---|
-| [Overview](docs/overview.md) | What TabAgent is, the problem it solves, the paper |
+| [Overview](docs/overview.md) | What ShortChain is, the problem it solves, the paper |
 | [Getting Started](docs/getting-started.md) | Installation, quick start, data format |
 | [Architecture](docs/architecture.md) | System design, data flow, module details |
 | [Configuration](docs/configuration.md) | Complete YAML reference for every setting |
@@ -133,3 +133,7 @@ pytest tests/ -v          # 100 tests, ~1.5 seconds
 ## License
 
 MIT
+
+---
+
+> Inspired by the research paper *"TabAgent"* (Levy et al., 2026).

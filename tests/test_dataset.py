@@ -5,10 +5,10 @@ from __future__ import annotations
 import pytest
 import pandas as pd
 
-from tabagent.config import DatasetConfig
-from tabagent.dataset.builder import DatasetBuilder, build_dataset
-from tabagent.dataset.splitter import GroupStratifiedSplitter
-from tabagent.ingest.schema import Step, Trajectory
+from shortchain.config import DatasetConfig
+from shortchain.dataset.builder import DatasetBuilder, build_dataset
+from shortchain.dataset.splitter import GroupStratifiedSplitter
+from shortchain.ingest.schema import Step, Trajectory
 
 
 # ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ class TestGroupStratifiedSplitter:
 
     def test_kfold_no_leakage(self, sample_trajectories, tool_catalog):
         df = build_dataset(sample_trajectories, tool_catalog=tool_catalog)
-        from tabagent.config import SplitterConfig
+        from shortchain.config import SplitterConfig
         splitter = GroupStratifiedSplitter(SplitterConfig(n_folds=3))
 
         for train_fold, val_fold in splitter.kfold_split(df):

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Evaluate a trained TabAgent model on a test set.
+"""Evaluate a trained ShortChain model on a test set.
 
 Usage::
 
     python scripts/evaluate.py \\
-        --model models/tabagent.pkl \\
+        --model models/shortchain.pkl \\
         --dataset data/datasets/test.csv
 """
 
@@ -14,17 +14,17 @@ import argparse
 
 import pandas as pd
 
-from tabagent.config import load_config
-from tabagent.evaluation.metrics import compute_metrics, format_metrics
-from tabagent.head.classifier import TabAgentClassifier
-from tabagent.utils.io import write_json
-from tabagent.utils.logging import get_logger
+from shortchain.config import load_config
+from shortchain.evaluation.metrics import compute_metrics, format_metrics
+from shortchain.head.classifier import ShortChainClassifier
+from shortchain.utils.io import write_json
+from shortchain.utils.logging import get_logger
 
 log = get_logger(__name__)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Evaluate a trained TabAgent model.")
+    parser = argparse.ArgumentParser(description="Evaluate a trained ShortChain model.")
     parser.add_argument(
         "--model",
         type=str,
@@ -56,7 +56,7 @@ def main() -> None:
 
     # Load model
     log.info(f"Loading model from {args.model}")
-    clf = TabAgentClassifier.load(args.model)
+    clf = ShortChainClassifier.load(args.model)
 
     # Load test data
     from pathlib import Path

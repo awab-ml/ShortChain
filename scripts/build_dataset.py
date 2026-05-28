@@ -14,12 +14,12 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from tabagent.config import load_config
-from tabagent.dataset.builder import DatasetBuilder
-from tabagent.dataset.splitter import GroupStratifiedSplitter
-from tabagent.ingest.loader import load_trajectories
-from tabagent.utils.io import ensure_dir
-from tabagent.utils.logging import get_logger
+from shortchain.config import load_config
+from shortchain.dataset.builder import DatasetBuilder
+from shortchain.dataset.splitter import GroupStratifiedSplitter
+from shortchain.ingest.loader import load_trajectories
+from shortchain.utils.io import ensure_dir
+from shortchain.utils.logging import get_logger
 
 log = get_logger(__name__)
 

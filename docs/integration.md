@@ -1,10 +1,10 @@
 # Integration Guide
 
-This guide explains how to integrate TabAgent into your existing agent system as an optimization layer.
+This guide explains how to integrate ShortChain into your existing agent system as an optimization layer.
 
 ## Integration Patterns
 
-TabAgent supports three deployment modes, ranging from conservative to aggressive cost savings:
+ShortChain supports three deployment modes, ranging from conservative to aggressive cost savings:
 
 ```
                  ┌──────────────────────────────────────────┐
@@ -29,17 +29,17 @@ TabAgent supports three deployment modes, ranging from conservative to aggressiv
 
 ## Mode A: Full Replacement
 
-TabAgent replaces the LLM entirely for tool selection. Use when you have high confidence in the classifier (well-trained model, tools are familiar).
+ShortChain replaces the LLM entirely for tool selection. Use when you have high confidence in the classifier (well-trained model, tools are familiar).
 
 ```python
-from tabagent.head.inference import InferenceEngine
+from shortchain.head.inference import InferenceEngine
 
 # Load once at startup (~50ms)
-engine = InferenceEngine(model_path="models/tabagent.pkl", top_k=5)
+engine = InferenceEngine(model_path="models/shortchain.pkl", top_k=5)
 
 
 def choose_tool(context: dict, tool_catalog: list[dict]) -> str:
-    """Replace LLM tool selection with TabAgent."""
+    """Replace LLM tool selection with ShortChain."""
     shortlist = engine.predict(context, tool_catalog, top_k=1)
     return shortlist[0][0]  # top tool name
 ```
@@ -55,17 +55,17 @@ def choose_tool(context: dict, tool_catalog: list[dict]) -> str:
 
 ## Mode B: Hybrid (Shortlist + LLM)
 
-TabAgent narrows candidates from N tools to 5, then the LLM picks from the shortlist. The LLM processes 5 tool descriptions instead of 100+, reducing prompt size and cost.
+ShortChain narrows candidates from N tools to 5, then the LLM picks from the shortlist. The LLM processes 5 tool descriptions instead of 100+, reducing prompt size and cost.
 
 ```python
-from tabagent.head.inference import InferenceEngine
+from shortchain.head.inference import InferenceEngine
 
-engine = InferenceEngine(model_path="models/tabagent.pkl", top_k=5)
+engine = InferenceEngine(model_path="models/shortchain.pkl", top_k=5)
 
 
 def choose_tool(context: dict, tool_catalog: list[dict], llm) -> str:
-    """TabAgent shortlists, LLM makes final decision."""
-    # Step 1: TabAgent narrows to top-5 (~1ms)
+    """ShortChain shortlists, LLM makes final decision."""
+    # Step 1: ShortChain narrows to top-5 (~1ms)
     shortlist = engine.predict(context, tool_catalog, top_k=5)
     
     # Step 2: LLM picks from shortlist (cheaper — 5 tools, not 100+)
@@ -81,20 +81,20 @@ def choose_tool(context: dict, tool_catalog: list[dict], llm) -> str:
 
 | Metric | Value |
 |---|---|
-| Latency | ~1ms (TabAgent) + ~200ms (LLM on small prompt) |
+| Latency | ~1ms (ShortChain) + ~200ms (LLM on small prompt) |
 | Cost | ~80-85% reduction (LLM sees 5 tools, not 100+) |
-| Risk | Low — LLM has final say, TabAgent only filters |
+| Risk | Low — LLM has final say, ShortChain only filters |
 
 ---
 
 ## Mode C: Adaptive (Confidence-Based Routing)
 
-Use TabAgent when it's confident, fall back to the LLM when it's not. Best balance of cost and accuracy.
+Use ShortChain when it's confident, fall back to the LLM when it's not. Best balance of cost and accuracy.
 
 ```python
-from tabagent.head.inference import InferenceEngine
+from shortchain.head.inference import InferenceEngine
 
-engine = InferenceEngine(model_path="models/tabagent.pkl", top_k=5)
+engine = InferenceEngine(model_path="models/shortchain.pkl", top_k=5)
 
 # Confidence thresholds (tune these on your eval set)
 HIGH_CONFIDENCE = 0.85
@@ -102,12 +102,12 @@ LOW_CONFIDENCE = 0.50
 
 
 def choose_tool(context: dict, tool_catalog: list[dict], llm) -> str:
-    """Route to TabAgent or LLM based on confidence."""
+    """Route to ShortChain or LLM based on confidence."""
     shortlist = engine.predict(context, tool_catalog, top_k=5)
     top_tool, top_score = shortlist[0]
     
     if top_score >= HIGH_CONFIDENCE:
-        # TabAgent is confident → use directly (no LLM call)
+        # ShortChain is confident → use directly (no LLM call)
         return top_tool
     
     elif top_score >= LOW_CONFIDENCE:
@@ -156,10 +156,10 @@ Optional but recommended: `app_name`, `thoughts`, `success`.
 If your log format uses different field names, create a config:
 
 ```yaml
-# tabagent_config.yaml
+# shortchain_config.yaml
 ingest:
   field_map:
-    task_id: "request_id"        # your field name → TabAgent field
+    task_id: "request_id"        # your field name → ShortChain field
     intent: "user_query"
     steps: "execution_trace"
     action: "function_call"
@@ -172,7 +172,7 @@ ingest:
 python scripts/build_dataset.py \
     --trajectories /path/to/your/logs/ \
     --output data/datasets/ \
-    --config tabagent_config.yaml
+    --config shortchain_config.yaml
 ```
 
 ### 4. Train Model
@@ -202,7 +202,7 @@ Check the metrics. Key thresholds:
 ### 6. Deploy
 
 ```python
-from tabagent.head.inference import InferenceEngine
+from shortchain.head.inference import InferenceEngine
 
 engine = InferenceEngine(model_path="models/my_agent.pkl")
 
@@ -217,13 +217,13 @@ shortlist = engine.predict(context, candidates, top_k=5)
 For full control, use the Python API directly:
 
 ```python
-from tabagent.config import load_config
-from tabagent.ingest.loader import load_trajectories
-from tabagent.dataset.builder import DatasetBuilder
-from tabagent.dataset.splitter import GroupStratifiedSplitter
-from tabagent.head.trainer import Trainer
-from tabagent.head.inference import InferenceEngine
-from tabagent.evaluation.metrics import compute_metrics
+from shortchain.config import load_config
+from shortchain.ingest.loader import load_trajectories
+from shortchain.dataset.builder import DatasetBuilder
+from shortchain.dataset.splitter import GroupStratifiedSplitter
+from shortchain.head.trainer import Trainer
+from shortchain.head.inference import InferenceEngine
+from shortchain.evaluation.metrics import compute_metrics
 
 # 1. Load config
 cfg = load_config("my_config.yaml")
@@ -310,18 +310,18 @@ Retraining is fast (~5 seconds for 1000 trajectories) and can be automated:
 ```bash
 # Automated retraining script
 python scripts/build_dataset.py --trajectories logs/latest/ --output data/datasets/
-python scripts/train.py --dataset data/datasets/ --output models/tabagent_v2.pkl
-python scripts/evaluate.py --model models/tabagent_v2.pkl --dataset data/datasets/test.csv
+python scripts/train.py --dataset data/datasets/ --output models/shortchain_v2.pkl
+python scripts/evaluate.py --model models/shortchain_v2.pkl --dataset data/datasets/test.csv
 
 # If metrics are good, swap the model:
-mv models/tabagent_v2.pkl models/tabagent.pkl
+mv models/shortchain_v2.pkl models/shortchain.pkl
 ```
 
 ---
 
 ## Cold Start Strategy
 
-When deploying TabAgent for the first time with no training data:
+When deploying ShortChain for the first time with no training data:
 
 1. **Week 1–2**: Run your agent with full LLM decisions. Log all traces.
 2. **Week 2**: Once you have 50+ successful trajectories, train the first model.

@@ -2,7 +2,7 @@
 
 ## System Overview
 
-TabAgent is organized into six modules that form a linear pipeline:
+ShortChain is organized into six modules that form a linear pipeline:
 
 ```
 ┌───────────┐    ┌──────────┐    ┌───────────┐    ┌──────────┐    ┌────────────┐
@@ -61,7 +61,7 @@ TabAgent is organized into six modules that form a linear pipeline:
        ▼
 6. Trainer.train_final()
    - Train on all data
-   - TabAgentClassifier.save() → models/tabagent.pkl
+   - ShortChainClassifier.save() → models/shortchain.pkl
    - Pickle contains: model + FeaturePipeline + config
 ```
 
@@ -83,7 +83,7 @@ TabAgent is organized into six modules that form a linear pipeline:
 
 ## Module Details
 
-### Ingest (`tabagent/ingest/`)
+### Ingest (`shortchain/ingest/`)
 
 **Purpose**: Normalize any agent log format into typed `Trajectory` objects.
 
@@ -100,7 +100,7 @@ schema.py
 loader.py
 └── JSONLTrajectoryLoader
     ├── .load(path)        — Load from file or directory
-    └── FieldMapConfig     — Maps your field names to TabAgent's
+    └── FieldMapConfig     — Maps your field names to ShortChain's
 ```
 
 **Design decisions:**
@@ -110,7 +110,7 @@ loader.py
 
 ---
 
-### Features (`tabagent/features/`)
+### Features (`shortchain/features/`)
 
 **Purpose**: Transform raw (context, tool) pairs into the numeric matrix the classifier consumes.
 
@@ -167,7 +167,7 @@ stats.py
 
 ---
 
-### Dataset (`tabagent/dataset/`)
+### Dataset (`shortchain/dataset/`)
 
 **Purpose**: Convert trajectories into supervised training data via pointwise reduction.
 
@@ -201,13 +201,13 @@ splitter.py
 
 ---
 
-### Head (`tabagent/head/`)
+### Head (`shortchain/head/`)
 
 **Purpose**: Train, persist, and run inference with the classifier.
 
 ```
 classifier.py
-└── TabAgentClassifier
+└── ShortChainClassifier
     ├── .fit(X, y)                 — Train (creates FeaturePipeline internally)
     ├── .predict_proba(X)          — Score candidates
     ├── .predict(X)                — Binary predictions
@@ -232,15 +232,15 @@ inference.py
 ```
 
 **Design decisions:**
-- `TabAgentClassifier.save()` stores the model, pipeline, and config together — one file to deploy
+- `ShortChainClassifier.save()` stores the model, pipeline, and config together — one file to deploy
 - v1 models (Phase 1, without FeaturePipeline) are loaded via a legacy compatibility adapter
 - `InferenceEngine` is the production API — takes plain dicts, returns `(tool_name, confidence)` tuples
 
 ---
 
-### Evaluation (`tabagent/evaluation/`)
+### Evaluation (`shortchain/evaluation/`)
 
-**Purpose**: Paper-faithful ranking metrics.
+**Purpose**: Faithful ranking metrics.
 
 ```
 metrics.py
@@ -251,18 +251,18 @@ metrics.py
 ```
 
 **Design decisions:**
-- R-precision (P@R) from the paper: if a task uses 3 tools, retrieve the top 3 and measure precision
+- R-precision (P@R) from the methodology: if a task uses 3 tools, retrieve the top 3 and measure precision
 - All ranking metrics are macro-averaged across tasks
 - `compute_metrics()` requires `task_id` column for ranking metrics but works without it for classification metrics
 
 ---
 
-### Config (`tabagent/config.py`)
+### Config (`shortchain/config.py`)
 
 **Purpose**: Single source of truth for all settings. YAML-based with deep-merge.
 
 ```
-TabAgentConfig (root)
+ShortChainConfig (root)
 ├── IngestConfig
 │   └── FieldMapConfig
 ├── FeaturesConfig
@@ -281,7 +281,7 @@ TabAgentConfig (root)
 
 ---
 
-### Utils (`tabagent/utils/`)
+### Utils (`shortchain/utils/`)
 
 ```
 io.py      — read_json, read_jsonl, write_json, write_jsonl, find_files, ensure_dir
@@ -291,8 +291,8 @@ logging.py — Rich-based structured logging, get_logger(), setup_file_logging()
 ## Project Structure
 
 ```
-TabAgent/
-├── tabagent/                     # Core package (2,920 lines)
+ShortChain/
+├── shortchain/                     # Core package (2,920 lines)
 │   ├── __init__.py
 │   ├── config.py                 # 11 Pydantic config models (220 lines)
 │   ├── ingest/                   # Trajectory loading (307 lines)
@@ -310,7 +310,7 @@ TabAgent/
 │   │   ├── negatives.py          #   Random/Hard/Mixed negative samplers
 │   │   └── splitter.py           #   GroupStratifiedSplitter
 │   ├── head/                     # Classifier (609 lines)
-│   │   ├── classifier.py         #   TabAgentClassifier
+│   │   ├── classifier.py         #   ShortChainClassifier
 │   │   ├── trainer.py            #   Trainer (CV + final)
 │   │   └── inference.py          #   InferenceEngine
 │   ├── evaluation/               # Metrics (197 lines)
@@ -334,7 +334,7 @@ TabAgent/
 ├── data/example/
 │   └── trajectories.jsonl        # 15 example trajectories
 ├── models/                       # Trained model artifacts
-│   ├── tabagent.pkl
+│   ├── shortchain.pkl
 │   └── cv_results.json
 ├── docs/                         # Documentation
 ├── pyproject.toml                # Package metadata + dependencies
