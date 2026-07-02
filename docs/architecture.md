@@ -89,12 +89,12 @@ ShortChain is organized into six modules that form a linear pipeline:
 
 ```
 schema.py
-├── Step          — Single agent action (action, observation, thoughts)
+├── Span          — Single agent action (action, observation, thoughts)
 │   └── .tool_name  — Extracts tool name from "send_email(to='x')" → "send_email"
 └── Trajectory    — Complete execution trace
     ├── .tools_used     — Auto-derived set of tool names
     ├── .tool_sequence  — Ordered list with duplicates
-    ├── .n_steps        — Step count
+    ├── .n_spans        — Span count
     └── .last_thought   — Last reasoning trace
 
 loader.py
@@ -105,7 +105,7 @@ loader.py
 
 **Design decisions:**
 - `FieldMapConfig` means zero code changes to ingest new log formats — just update YAML
-- `Step.tool_name` handles both `"send_email"` and `"send_email(to='x', subject='...')"` formats
+- `Span.tool_name` handles both `"send_email"` and `"send_email(to='x', subject='...')"` formats
 - `tools_used` is auto-derived via `@model_validator` — no manual extraction needed
 
 ---
@@ -126,7 +126,7 @@ pipeline.py
         │              history_summary, last_observation
         │              → TfidfEncoder or DenseEncoder (per column)
         ├── CAT_COLS:  app_name → LabelEncoder
-        ├── NUM_COLS:  n_steps, step_index, unique_tools_so_far,
+        ├── NUM_COLS:  n_spans, span_index, unique_tools_so_far,
         │              tool_diversity, app_tool_count,
         │              tool_name_length, tool_frequency, tool_co_occurrence
         └── BOOL_COLS: has_description, tool_app_match
@@ -139,11 +139,11 @@ encoders.py
 
 context.py
 └── ContextFeatureBuilder
-    ├── Core: task_id, intent, app_name, n_steps, previous_tools, last_thought
-    ├── State: step_index, last_action, last_observation, unique_tools_so_far,
+    ├── Core: task_id, intent, app_name, n_spans, previous_tools, last_thought
+    ├── State: span_index, last_action, last_observation, unique_tools_so_far,
     │          history_summary
     └── Dependencies: tool_diversity, app_tool_count
-    └── Supports step_index=None (trajectory-level) or step_index=int (step-level)
+    └── Supports span_index=None (trajectory-level) or span_index=int (span-level)
 
 tool.py
 └── ToolFeatureBuilder
@@ -163,7 +163,7 @@ stats.py
 - `FeaturePipeline` accepts both `pd.DataFrame` and `list[dict]` — DataFrame for training, dicts for production inference
 - Text columns get individual encoders (not one shared encoder) so vocabulary is column-specific
 - `CorpusStats` is computed once and shared by feature builders and negative samplers
-- `step_index=None` vs `step_index=int` enables future step-level features without API changes
+- `span_index=None` vs `span_index=int` enables future span-level features without API changes
 
 ---
 
@@ -296,7 +296,7 @@ ShortChain/
 │   ├── __init__.py
 │   ├── config.py                 # 11 Pydantic config models (220 lines)
 │   ├── ingest/                   # Trajectory loading (307 lines)
-│   │   ├── schema.py             #   Step + Trajectory models
+│   │   ├── schema.py             #   Span + Trajectory models
 │   │   ├── loader.py             #   JSONLTrajectoryLoader
 │   │   └── base.py               #   Abstract loader base
 │   ├── features/                 # Feature pipeline (834 lines)

@@ -12,8 +12,8 @@ from typing import Any
 from pydantic import BaseModel, Field, model_validator
 
 
-class Step(BaseModel):
-    """A single step in an agent execution trajectory."""
+class Span(BaseModel):
+    """A single span in an agent execution trajectory."""
 
     agent_name: str = ""
     action: str | None = None          # tool / API called
@@ -36,11 +36,11 @@ class Step(BaseModel):
 
 
 class Trajectory(BaseModel):
-    """A complete agent execution trajectory for one task."""
+    """A complete agent execution trajectory (trace) for one task."""
 
     task_id: str
     intent: str                                     # user's original goal
-    steps: list[Step] = Field(default_factory=list)
+    spans: list[Span] = Field(default_factory=list)
     success: bool = True
     app_name: str = ""                              # application context
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -50,32 +50,32 @@ class Trajectory(BaseModel):
 
     @model_validator(mode="after")
     def _derive_tools_used(self) -> "Trajectory":
-        """Automatically derive the set of tools used from steps."""
+        """Automatically derive the set of tools used from spans."""
         if not self.tools_used:
             tools: set[str] = set()
-            for step in self.steps:
-                name = step.tool_name
+            for span in self.spans:
+                name = span.tool_name
                 if name:
                     tools.add(name)
             self.tools_used = tools
         return self
 
     @property
-    def n_steps(self) -> int:
-        """Number of steps in this trajectory."""
-        return len(self.steps)
+    def n_spans(self) -> int:
+        """Number of spans in this trajectory."""
+        return len(self.spans)
 
     @property
     def tool_sequence(self) -> list[str]:
         """Ordered list of tools called (with duplicates)."""
-        return [s.tool_name for s in self.steps if s.tool_name]
+        return [s.tool_name for s in self.spans if s.tool_name]
 
     @property
     def last_thought(self) -> str | None:
-        """The reasoning trace from the last step, if available."""
-        for step in reversed(self.steps):
-            if step.thoughts:
-                return step.thoughts
+        """The reasoning trace from the last span, if available."""
+        for span in reversed(self.spans):
+            if span.thoughts:
+                return span.thoughts
         return None
 
     def summary(self) -> dict[str, Any]:
@@ -84,7 +84,7 @@ class Trajectory(BaseModel):
             "task_id": self.task_id,
             "intent": self.intent[:80] + ("..." if len(self.intent) > 80 else ""),
             "app": self.app_name,
-            "n_steps": self.n_steps,
+            "n_spans": self.n_spans,
             "n_tools": len(self.tools_used),
             "success": self.success,
         }

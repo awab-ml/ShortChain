@@ -13,7 +13,7 @@ The system flows through four main stages. You can execute these via the `script
 ### 1. Data Ingestion (`shortchain/ingest`)
 *   **What it does:** Reads raw agent execution logs (`.json` or `.jsonl`). 
 *   **How it works:** We implemented a `JSONLTrajectoryLoader` that uses a **field mapping configuration**. This allows the tool to parse trajectories from various sources (like LangChain, IBM CUGA, or custom internal formats) without altering the Python code. You simply update `configs/default.yaml`.
-*   **Output:** Validated Pydantic `Trajectory` objects containing intent, steps, and automatically derived `tools_used`.
+*   **Output:** Validated Pydantic `Trajectory` objects containing intent, spans, and automatically derived `tools_used`.
 
 ### 2. Dataset Construction (`shortchain/dataset`)
 *   **What it does:** Converts trajectories into machine learning ready rows.
@@ -51,7 +51,7 @@ python scripts/train.py --dataset data/datasets/ --output models/shortchain.pkl 
 python scripts/evaluate.py --model models/shortchain.pkl --dataset data/datasets/test.csv
 ```
 
-## Next Steps (Phase 2 & Beyond)
+## Next Spans (Phase 2 & Beyond)
 Now that the core machine-learning infrastructure is solid and tested:
 1.  **Phase 2:** We will replace the simple TF-IDF vectors with Dense Semantic Retrieval embeddings (e.g., E5-small) and add BM25/DSR baseline comparisons.
 2.  **Phase 3 & 4:** We will tackle the heavy multi-agent LLM systems (**TabSchema** for automated feature extraction, and **TabSynth** for generative data augmentation). 

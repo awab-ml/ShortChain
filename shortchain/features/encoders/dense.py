@@ -76,7 +76,7 @@ class DenseEncoder:
         return np.asarray(embeddings, dtype=np.float32)
 
     def fit_transform(self, texts: list[str]) -> np.ndarray:
-        """Fit and transform in one step."""
+        """Fit and transform in one span."""
         self.fit(texts)
         return self.transform(texts)
 

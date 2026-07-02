@@ -40,7 +40,7 @@ class TextEncoder(Protocol):
         ...
 
     def fit_transform(self, texts: list[str]) -> np.ndarray:
-        """Fit and transform in one step."""
+        """Fit and transform in one span."""
         ...
 
     @property

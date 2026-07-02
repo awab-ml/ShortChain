@@ -8,31 +8,31 @@ from pathlib import Path
 
 import pytest
 
-from shortchain.ingest.schema import Step, Trajectory
+from shortchain.ingest.schema import Span, Trajectory
 from shortchain.ingest.loader import JSONLTrajectoryLoader, load_trajectories
 from shortchain.config import IngestConfig
 
 
 # ---------------------------------------------------------------------------
-# Step model tests
+# Span model tests
 # ---------------------------------------------------------------------------
 
 class TestStep:
     def test_tool_name_extraction(self):
-        step = Step(action="send_email")
-        assert step.tool_name == "send_email"
+        span = Span(action="send_email")
+        assert span.tool_name == "send_email"
 
     def test_tool_name_with_args(self):
-        step = Step(action="send_email(to='john@example.com')")
-        assert step.tool_name == "send_email"
+        span = Span(action="send_email(to='john@example.com')")
+        assert span.tool_name == "send_email"
 
     def test_tool_name_none_when_no_action(self):
-        step = Step(thoughts="Just thinking...")
-        assert step.tool_name is None
+        span = Span(thoughts="Just thinking...")
+        assert span.tool_name is None
 
     def test_tool_name_none_when_empty(self):
-        step = Step(action="")
-        assert step.tool_name is None
+        span = Span(action="")
+        assert span.tool_name is None
 
 
 # ---------------------------------------------------------------------------
@@ -44,10 +44,10 @@ class TestTrajectory:
         traj = Trajectory(
             task_id="t1",
             intent="test",
-            steps=[
-                Step(action="tool_a"),
-                Step(action="tool_b"),
-                Step(action="tool_a"),  # duplicate
+            spans=[
+                Span(action="tool_a"),
+                Span(action="tool_b"),
+                Span(action="tool_a"),  # duplicate
             ],
         )
         assert traj.tools_used == {"tool_a", "tool_b"}
@@ -58,19 +58,19 @@ class TestTrajectory:
             task_id="t1",
             intent="test",
             tools_used={"x", "y"},
-            steps=[Step(action="tool_a")],
+            spans=[Span(action="tool_a")],
         )
         assert traj.tools_used == {"x", "y"}
 
-    def test_n_steps(self):
-        traj = Trajectory(task_id="t1", intent="test", steps=[Step(), Step()])
-        assert traj.n_steps == 2
+    def test_n_spans(self):
+        traj = Trajectory(task_id="t1", intent="test", spans=[Span(), Span()])
+        assert traj.n_spans == 2
 
     def test_tool_sequence(self):
         traj = Trajectory(
             task_id="t1",
             intent="test",
-            steps=[Step(action="a"), Step(thoughts="no action"), Step(action="b")],
+            spans=[Span(action="a"), Span(thoughts="no action"), Span(action="b")],
         )
         assert traj.tool_sequence == ["a", "b"]
 
@@ -78,16 +78,16 @@ class TestTrajectory:
         traj = Trajectory(
             task_id="t1",
             intent="test",
-            steps=[
-                Step(thoughts="first thought"),
-                Step(action="tool"),
-                Step(thoughts="last thought"),
+            spans=[
+                Span(thoughts="first thought"),
+                Span(action="tool"),
+                Span(thoughts="last thought"),
             ],
         )
         assert traj.last_thought == "last thought"
 
     def test_last_thought_none(self):
-        traj = Trajectory(task_id="t1", intent="test", steps=[Step(action="a")])
+        traj = Trajectory(task_id="t1", intent="test", spans=[Span(action="a")])
         assert traj.last_thought is None
 
     def test_summary(self):
@@ -113,7 +113,7 @@ class TestJSONLLoader:
                 "task_id": "t1",
                 "intent": "Do something",
                 "success": True,
-                "steps": [
+                "spans": [
                     {"action": "tool_a", "agent_name": "Agent1"},
                     {"action": "tool_b", "agent_name": "Agent1"},
                 ],
@@ -122,7 +122,7 @@ class TestJSONLLoader:
                 "task_id": "t2",
                 "intent": "Do another thing",
                 "success": True,
-                "steps": [{"action": "tool_c"}],
+                "spans": [{"action": "tool_c"}],
             },
         ]
         self._write_jsonl(records, tmp_path / "data.jsonl")
@@ -133,8 +133,8 @@ class TestJSONLLoader:
 
     def test_filter_unsuccessful(self, tmp_path: Path):
         records = [
-            {"task_id": "t1", "intent": "ok", "success": True, "steps": []},
-            {"task_id": "t2", "intent": "fail", "success": False, "steps": []},
+            {"task_id": "t1", "intent": "ok", "success": True, "spans": []},
+            {"task_id": "t2", "intent": "fail", "success": False, "spans": []},
         ]
         self._write_jsonl(records, tmp_path / "data.jsonl")
         trajs = load_trajectories(tmp_path)
@@ -143,8 +143,8 @@ class TestJSONLLoader:
 
     def test_load_all_when_not_filtering(self, tmp_path: Path):
         records = [
-            {"task_id": "t1", "intent": "ok", "success": True, "steps": []},
-            {"task_id": "t2", "intent": "fail", "success": False, "steps": []},
+            {"task_id": "t1", "intent": "ok", "success": True, "spans": []},
+            {"task_id": "t2", "intent": "fail", "success": False, "spans": []},
         ]
         self._write_jsonl(records, tmp_path / "data.jsonl")
         config = IngestConfig(success_only=False)
@@ -153,8 +153,8 @@ class TestJSONLLoader:
 
     def test_score_field_as_success(self, tmp_path: Path):
         records = [
-            {"task_id": "t1", "intent": "ok", "score": 1.0, "steps": []},
-            {"task_id": "t2", "intent": "fail", "score": 0.0, "steps": []},
+            {"task_id": "t1", "intent": "ok", "score": 1.0, "spans": []},
+            {"task_id": "t2", "intent": "fail", "score": 0.0, "spans": []},
         ]
         self._write_jsonl(records, tmp_path / "data.jsonl")
         trajs = load_trajectories(tmp_path)
@@ -162,7 +162,7 @@ class TestJSONLLoader:
 
     def test_load_json_file(self, tmp_path: Path):
         data = [
-            {"task_id": "t1", "intent": "test", "success": True, "steps": [{"action": "x"}]},
+            {"task_id": "t1", "intent": "test", "success": True, "spans": [{"action": "x"}]},
         ]
         path = tmp_path / "data.json"
         with open(path, "w") as f:
@@ -170,10 +170,10 @@ class TestJSONLLoader:
         trajs = load_trajectories(path)
         assert len(trajs) == 1
 
-    def test_simple_step_format(self, tmp_path: Path):
-        """Steps as plain strings (tool names only)."""
+    def test_simple_span_format(self, tmp_path: Path):
+        """Spans as plain strings (tool names only)."""
         records = [
-            {"task_id": "t1", "intent": "test", "success": True, "steps": ["tool_a", "tool_b"]},
+            {"task_id": "t1", "intent": "test", "success": True, "spans": ["tool_a", "tool_b"]},
         ]
         self._write_jsonl(records, tmp_path / "data.jsonl")
         trajs = load_trajectories(tmp_path)

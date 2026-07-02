@@ -16,7 +16,7 @@ Usage::
         --benchmark toolbench \\
         --train-path data/toolbench/train.jsonl \\
         --eval-path data/toolbench/test.jsonl \\
-        --step-level \\
+        --span-level \\
         --max-train 500
 """
 
@@ -72,9 +72,9 @@ def parse_args() -> argparse.Namespace:
         help="Path to a YAML config file (overrides defaults).",
     )
     parser.add_argument(
-        "--step-level",
+        "--span-level",
         action="store_true",
-        help="Enable step-level trajectory expansion.",
+        help="Enable span-level trajectory expansion.",
     )
     parser.add_argument(
         "--failure-negatives",
@@ -110,14 +110,14 @@ def main() -> None:
     cfg = load_config(args.config)
 
     # Apply CLI overrides
-    if args.step_level:
-        cfg.benchmark.step_level = True
+    if args.span_level:
+        cfg.benchmark.span_level = True
     if args.failure_negatives:
         cfg.benchmark.use_failure_negatives = True
 
     log.info(
         f"[bold]Benchmark:[/bold] {args.benchmark}  |  "
-        f"step_level={cfg.benchmark.step_level}  |  "
+        f"span_level={cfg.benchmark.span_level}  |  "
         f"failure_negs={cfg.benchmark.use_failure_negatives}"
     )
 
@@ -131,7 +131,7 @@ def main() -> None:
     )
 
     # 3. Load data via adapter
-    log.info("[bold]Step 1:[/bold] Loading data via adapter")
+    log.info("[bold]Span 1:[/bold] Loading data via adapter")
     catalog = adapter.load_catalog()
     train_trajs = adapter.load_trajectories("train")
     test_trajs = adapter.load_trajectories("test")
@@ -155,7 +155,7 @@ def main() -> None:
     )
 
     # 4. Build dataset (core pipeline — fully generic)
-    log.info("[bold]Step 2:[/bold] Building training dataset")
+    log.info("[bold]Span 2:[/bold] Building training dataset")
     builder = DatasetBuilder(
         config=cfg.dataset,
         features_config=cfg.features,
@@ -168,7 +168,7 @@ def main() -> None:
     train_df = adapter.augment_training(train_df)
 
     # 6. Train with cross-validation
-    log.info("[bold]Step 3:[/bold] Training with cross-validation")
+    log.info("[bold]Span 3:[/bold] Training with cross-validation")
     trainer = Trainer(
         classifier_config=cfg.classifier,
         splitter_config=cfg.splitter,
@@ -177,14 +177,14 @@ def main() -> None:
     cv_results = trainer.train_with_cv(train_df)
 
     # 7. Train final model
-    log.info("[bold]Step 4:[/bold] Training final model")
+    log.info("[bold]Span 4:[/bold] Training final model")
     output_path = Path(args.output)
     ensure_dir(output_path.parent)
     clf = trainer.train_final(train_df, save_path=output_path)
     log.info(f"  Model saved to {output_path}")
 
     # 8. Evaluate on test set
-    log.info("[bold]Step 5:[/bold] Evaluating on test set")
+    log.info("[bold]Span 5:[/bold] Evaluating on test set")
     test_df = builder.build(test_trajs)
     X_test = test_df.drop(columns=["label"])
     y_test = test_df["label"].values
@@ -205,7 +205,7 @@ def main() -> None:
     results = {
         "benchmark": args.benchmark,
         "config": {
-            "step_level": cfg.benchmark.step_level,
+            "span_level": cfg.benchmark.span_level,
             "use_failure_negatives": cfg.benchmark.use_failure_negatives,
         },
         "cv_results": cv_results,

@@ -53,7 +53,7 @@ class TfidfEncoder:
         return mat.toarray()
 
     def fit_transform(self, texts: list[str]) -> np.ndarray:
-        """Fit and transform in one step."""
+        """Fit and transform in one span."""
         clean = [str(t) if t else "" for t in texts]
         try:
             mat = self._vectorizer.fit_transform(clean)

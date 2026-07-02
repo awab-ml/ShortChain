@@ -47,7 +47,7 @@ class BenchmarkAdapter(Protocol):
         Must return ``Trajectory`` objects with:
         - ``tools_used`` populated
         - ``metadata["available_tools"]`` if candidate-constraint is desired
-        - ``metadata["step_index"]`` if step-level expansion was applied
+        - ``metadata["span_index"]`` if span-level expansion was applied
 
         Parameters
         ----------

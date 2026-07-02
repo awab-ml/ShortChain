@@ -20,7 +20,7 @@ from shortchain.features.encoders import TfidfEncoder, DenseEncoder, create_enco
 from shortchain.features.pipeline import FeaturePipeline
 from shortchain.features.stats import CorpusStats
 from shortchain.features.tool import ToolFeatureBuilder
-from shortchain.ingest.schema import Step, Trajectory
+from shortchain.ingest.schema import Span, Trajectory
 
 
 # ---------------------------------------------------------------------------
@@ -35,15 +35,15 @@ def _make_trajectory(
 ) -> Trajectory:
     """Create a minimal Trajectory for testing."""
     tools = tools or ["search_emails", "send_email"]
-    steps = [
-        Step(agent_name="agent", action=t, observation=f"did {t}", thoughts=f"thinking about {t}")
+    spans = [
+        Span(agent_name="agent", action=t, observation=f"did {t}", thoughts=f"thinking about {t}")
         for t in tools
     ]
     return Trajectory(
         task_id=task_id,
         intent=intent,
         app_name=app_name,
-        steps=steps,
+        spans=spans,
     )
 
 
@@ -127,13 +127,13 @@ class TestContextFeatureBuilder(unittest.TestCase):
         self.assertIn("task_id", features)
         self.assertIn("intent", features)
         self.assertIn("app_name", features)
-        self.assertIn("n_steps", features)
+        self.assertIn("n_spans", features)
         self.assertIn("previous_tools", features)
         self.assertIn("last_thought", features)
 
     def test_state_features_present(self):
         features = self.builder.build(self.trajs[0])
-        self.assertIn("step_index", features)
+        self.assertIn("span_index", features)
         self.assertIn("last_action", features)
         self.assertIn("last_observation", features)
         self.assertIn("unique_tools_so_far", features)
@@ -144,22 +144,22 @@ class TestContextFeatureBuilder(unittest.TestCase):
         self.assertIn("tool_diversity", features)
         self.assertIn("app_tool_count", features)
 
-    def test_step_index_none_default(self):
-        """step_index=None gives trajectory-level features."""
-        features = self.builder.build(self.trajs[0], step_index=None)
-        self.assertEqual(features["n_steps"], 2)
-        self.assertEqual(features["step_index"], 2)  # final position
+    def test_span_index_none_default(self):
+        """span_index=None gives trajectory-level features."""
+        features = self.builder.build(self.trajs[0], span_index=None)
+        self.assertEqual(features["n_spans"], 2)
+        self.assertEqual(features["span_index"], 2)  # final position
 
-    def test_step_index_specific(self):
-        """step_index=0 gives features up to step 0."""
-        features = self.builder.build(self.trajs[0], step_index=0)
-        self.assertEqual(features["n_steps"], 1)
-        self.assertEqual(features["step_index"], 0)
+    def test_span_index_specific(self):
+        """span_index=0 gives features up to span 0."""
+        features = self.builder.build(self.trajs[0], span_index=0)
+        self.assertEqual(features["n_spans"], 1)
+        self.assertEqual(features["span_index"], 0)
 
     def test_state_disabled(self):
         builder = ContextFeatureBuilder(include_state=False, include_dependencies=True)
         features = builder.build(self.trajs[0])
-        self.assertNotIn("step_index", features)
+        self.assertNotIn("span_index", features)
         self.assertNotIn("last_action", features)
 
     def test_dependencies_disabled(self):
@@ -307,7 +307,7 @@ class TestFeaturePipeline(unittest.TestCase):
             {
                 "intent": "Send email",
                 "app_name": "gmail",
-                "n_steps": 2,
+                "n_spans": 2,
                 "previous_tools": "search_emails",
                 "last_thought": "compose message",
                 "tool_name": "send_email",
@@ -316,7 +316,7 @@ class TestFeaturePipeline(unittest.TestCase):
             {
                 "intent": "Make call",
                 "app_name": "phone",
-                "n_steps": 1,
+                "n_spans": 1,
                 "previous_tools": "",
                 "last_thought": "dial number",
                 "tool_name": "make_call",
@@ -372,7 +372,7 @@ class TestFeaturePipeline(unittest.TestCase):
         """Pipeline should handle Phase 2 numeric columns gracefully."""
         pipe = FeaturePipeline()
         df = self._sample_df()
-        df["step_index"] = [2, 1]
+        df["span_index"] = [2, 1]
         df["unique_tools_so_far"] = [2, 1]
         df["tool_diversity"] = [1.0, 1.0]
         df["app_tool_count"] = [3, 2]

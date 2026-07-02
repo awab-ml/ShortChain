@@ -38,8 +38,8 @@ _TEXT_COLS = [
 
 # Numeric columns passed through directly
 _NUM_COLS = [
-    "n_steps",
-    "step_index",
+    "n_spans",
+    "span_index",
     "unique_tools_so_far",
     "tool_diversity",
     "app_tool_count",

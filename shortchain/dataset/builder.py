@@ -147,7 +147,7 @@ class DatasetBuilder:
         sampler: NegativeSampler,
     ) -> list[dict[str, Any]]:
         """Create positive + negative (context, tool, label) rows for one trajectory."""
-        context = context_builder.build(traj, step_index=None)
+        context = context_builder.build(traj, span_index=None)
         rows: list[dict[str, Any]] = []
 
         # Positive pairs: tools actually used

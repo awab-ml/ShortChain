@@ -2,24 +2,24 @@
 
 ## Ingestion
 
-### `Step`
+### `Span`
 
 ```python
-from shortchain.ingest.schema import Step
+from shortchain.ingest.schema import Span
 
-step = Step(
+span = Span(
     agent_name="CoderAgent",
     action="send_email(to='john@example.com')",
     observation="Email sent successfully",
     thoughts="Need to send the composed email",
 )
 
-step.tool_name   # "send_email" — auto-extracted from action
+span.tool_name   # "send_email" — auto-extracted from action
 ```
 
 | Attribute | Type | Description |
 |---|---|---|
-| `agent_name` | `str` | Name of the agent that took this step |
+| `agent_name` | `str` | Name of the agent that took this span |
 | `action` | `str \| None` | Tool/API called (e.g., `"send_email"` or `"send_email(args)"`) |
 | `observation` | `str \| None` | Result of the action |
 | `thoughts` | `str \| None` | Agent reasoning trace |
@@ -36,14 +36,14 @@ from shortchain.ingest.schema import Trajectory
 traj = Trajectory(
     task_id="task_001",
     intent="Send an email to John",
-    steps=[step1, step2, step3],
+    spans=[span1, span2, span3],
     success=True,
     app_name="gmail",
 )
 
 traj.tools_used     # {"search_contacts", "create_draft", "send_email"}
 traj.tool_sequence  # ["search_contacts", "create_draft", "send_email"]
-traj.n_steps        # 3
+traj.n_spans        # 3
 traj.last_thought   # "Sending the drafted email"
 traj.summary()      # {"task_id": "task_001", "intent": "Send an email...", ...}
 ```
@@ -52,12 +52,12 @@ traj.summary()      # {"task_id": "task_001", "intent": "Send an email...", ...}
 |---|---|---|
 | `task_id` | `str` | Unique task identifier |
 | `intent` | `str` | User's original goal |
-| `steps` | `list[Step]` | Execution steps |
+| `spans` | `list[Span]` | Execution spans |
 | `success` | `bool` | Whether the task completed successfully |
 | `app_name` | `str` | Application context |
 | `tools_used` | `set[str]` | **Auto-derived** — unique tools called |
 | `tool_sequence` | `list[str]` | **Property** — ordered tool calls |
-| `n_steps` | `int` | **Property** — number of steps |
+| `n_spans` | `int` | **Property** — number of spans |
 | `last_thought` | `str \| None` | **Property** — last reasoning trace |
 
 ---
@@ -109,18 +109,18 @@ from shortchain.features.context import ContextFeatureBuilder
 
 builder = ContextFeatureBuilder(
     corpus_stats=stats,          # Optional
-    include_state=True,          # step_index, last_action, etc.
+    include_state=True,          # span_index, last_action, etc.
     include_dependencies=True,   # tool_diversity, app_tool_count
 )
 
 # Trajectory-level features (default)
-features = builder.build(traj, step_index=None)
-# Returns: {"task_id": "...", "intent": "...", "n_steps": 4, "step_index": 4,
+features = builder.build(traj, span_index=None)
+# Returns: {"task_id": "...", "intent": "...", "n_spans": 4, "span_index": 4,
 #           "last_action": "send_email", "tool_diversity": 0.75, ...}
 
-# Step-level features (for future use)
-features = builder.build(traj, step_index=2)
-# Returns features as-of step 2 only
+# Span-level features (for future use)
+features = builder.build(traj, span_index=2)
+# Returns features as-of span 2 only
 ```
 
 ---
@@ -197,10 +197,10 @@ builder.corpus_stats  # CorpusStats object
 | `task_id` | str | Context |
 | `intent` | str | Context |
 | `app_name` | str | Context |
-| `n_steps` | int | Context |
+| `n_spans` | int | Context |
 | `previous_tools` | str | Context |
 | `last_thought` | str | Context |
-| `step_index` | int | State feature |
+| `span_index` | int | State feature |
 | `last_action` | str | State feature |
 | `last_observation` | str | State feature |
 | `unique_tools_so_far` | int | State feature |
@@ -300,7 +300,7 @@ shortlist = engine.predict(
     context={
         "intent": "Send an email to John",
         "app_name": "gmail",
-        "n_steps": 2,
+        "n_spans": 2,
         "previous_tools": "search_contacts",
         "last_thought": "Found John's email address",
     },

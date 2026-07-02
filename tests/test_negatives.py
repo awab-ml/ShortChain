@@ -12,7 +12,7 @@ from shortchain.dataset.negatives import (
     create_sampler,
 )
 from shortchain.features.stats import CorpusStats
-from shortchain.ingest.schema import Step, Trajectory
+from shortchain.ingest.schema import Span, Trajectory
 
 
 # ---------------------------------------------------------------------------
@@ -22,11 +22,11 @@ from shortchain.ingest.schema import Step, Trajectory
 def _make_trajectories() -> list[Trajectory]:
     """Create a small corpus for testing negative sampling."""
     def _traj(tid, intent, app, tools):
-        steps = [
-            Step(agent_name="a", action=t, observation=f"obs_{t}")
+        spans = [
+            Span(agent_name="a", action=t, observation=f"obs_{t}")
             for t in tools
         ]
-        return Trajectory(task_id=tid, intent=intent, app_name=app, steps=steps)
+        return Trajectory(task_id=tid, intent=intent, app_name=app, spans=spans)
 
     return [
         _traj("t1", "Send email", "gmail", ["search_emails", "send_email"]),

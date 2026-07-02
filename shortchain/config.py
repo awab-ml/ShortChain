@@ -22,7 +22,7 @@ class FieldMapConfig(BaseModel):
 
     task_id: str = "task_id"
     intent: str = "intent"
-    steps: str = "steps"
+    spans: str = "spans"
     success: str = "success"
     agent_name: str = "agent_name"
     action: str = "action"
@@ -48,7 +48,7 @@ class FeaturesConfig(BaseModel):
         default_factory=lambda: [
             "intent",
             "app_name",
-            "n_steps",
+            "n_spans",
             "previous_tools",
             "last_thought",
         ]
@@ -78,7 +78,7 @@ class DatasetConfig(BaseModel):
         default_factory=lambda: [
             "intent",
             "app_name",
-            "n_steps",
+            "n_spans",
             "previous_tools",
             "last_thought",
         ]
@@ -164,7 +164,7 @@ class BenchmarkConfig(BaseModel):
     """
 
     adapter: str = "toolbench"               # adapter name from registry
-    step_level: bool = False                  # expand trajectories to per-step samples
+    span_level: bool = False                  # expand trajectories to per-span samples
     use_failure_negatives: bool = False       # augment training with failure negatives
     failure_negative_ratio: float = 0.3       # fraction of failure rows to inject
 

@@ -238,7 +238,7 @@ class ShortChainClassifier:
 
     # Text columns used in Phase 1
     _LEGACY_TEXT = ["intent", "previous_tools", "last_thought", "tool_name", "tool_description"]
-    _LEGACY_NUM = ["n_steps"]
+    _LEGACY_NUM = ["n_spans"]
     _LEGACY_CAT = ["app_name"]
 
     def _legacy_transform(self, X: pd.DataFrame) -> np.ndarray:

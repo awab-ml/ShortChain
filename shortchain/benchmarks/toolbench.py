@@ -8,8 +8,8 @@ The adapter handles ToolBench-specific concerns:
 
 - Loading the tool catalog from a directory of tool descriptions or
   deriving it from trajectories.
-- Step-level expansion via the core ``expand_to_step_trajectories``
-  transform (controlled by ``BenchmarkConfig.step_level``).
+- Span-level expansion via the core ``expand_to_span_trajectories``
+  transform (controlled by ``BenchmarkConfig.span_level``).
 - Failure-negative augmentation on the training DataFrame.
 """
 
@@ -21,7 +21,7 @@ from typing import Any
 import pandas as pd
 
 from shortchain.config import BenchmarkConfig, IngestConfig
-from shortchain.data.transforms import expand_to_step_trajectories
+from shortchain.data.transforms import expand_to_span_trajectories
 from shortchain.ingest.loader import JSONLTrajectoryLoader
 from shortchain.ingest.schema import Trajectory
 from shortchain.utils.logging import get_logger
@@ -39,7 +39,7 @@ class ToolBenchAdapter:
     Parameters
     ----------
     benchmark_config
-        Generic benchmark settings (step_level, failure negatives, etc.).
+        Generic benchmark settings (span_level, failure negatives, etc.).
     ingest_config
         Ingestion settings (field mappings, success_only filter, etc.).
     train_path
@@ -125,7 +125,7 @@ class ToolBenchAdapter:
         For the training split:
         - Loads all trajectories (including failures).
         - Separates successful from failed trajectories.
-        - Optionally applies step-level expansion to successful ones.
+        - Optionally applies span-level expansion to successful ones.
         - Caches failed trajectories for ``augment_training()``.
 
         For the test split:
@@ -196,7 +196,7 @@ class ToolBenchAdapter:
     # ------------------------------------------------------------------
 
     def _load_train(self) -> list[Trajectory]:
-        """Load training trajectories with optional step expansion."""
+        """Load training trajectories with optional span expansion."""
         if self.train_path is None:
             raise ValueError("train_path must be set to load training trajectories")
 
@@ -214,14 +214,14 @@ class ToolBenchAdapter:
         if not self._catalog:
             self._catalog = self._derive_catalog(all_trajs)
 
-        # Step-level expansion (uses core transform from shortchain.data)
-        if self.benchmark_config.step_level:
+        # Span-level expansion (uses core transform from shortchain.data)
+        if self.benchmark_config.span_level:
             expanded: list[Trajectory] = []
             for t in success:
-                expanded.extend(expand_to_step_trajectories(t))
+                expanded.extend(expand_to_span_trajectories(t))
             log.info(
-                f"  └─ Step expansion: {len(success)} trajectories → "
-                f"[bold]{len(expanded)}[/bold] step-level samples"
+                f"  └─ Span expansion: {len(success)} trajectories → "
+                f"[bold]{len(expanded)}[/bold] span-level samples"
             )
             return expanded
 

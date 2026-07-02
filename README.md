@@ -74,7 +74,7 @@ ShortChain/
 - **Agent-agnostic** — works with any agent that produces JSON execution logs
 - **Configurable field mapping** — map your log fields to ShortChain's schema via YAML
 - **Modular feature pipeline** — context, tool, and encoding stages via `FeaturePipeline`
-- **State-aware features** — step index, last action, history summary, tool diversity
+- **State-aware features** — span index, last action, history summary, tool diversity
 - **Pluggable negative sampling** — random, hard (same-app, co-usage, similarity), or mixed
 - **Hybrid text encoding** — TF-IDF (default) or E5-small dense embeddings
 - **Group-aware splits** — no task-level data leakage in train/test/CV
@@ -120,7 +120,7 @@ python scripts/train.py --dataset data/datasets/ --config my_config.yaml
 | 2 — Features | Modular FeaturePipeline, negative sampling, encoders | ✅ Complete |
 | 3A — TabSchema | LLM-driven feature extraction (optional enhancement) | Planned |
 | 3B — TabSynth | Synthetic data generation for rare patterns | Planned |
-| 3C — Step-Level | Per-step decision modeling (experimental mode) | Planned |
+| 3C — Span-Level | Per-span decision modeling (experimental mode) | Planned |
 | 4 — Benchmarks | AppWorld adapter, real-world evaluation | Planned |
 
 ## Development

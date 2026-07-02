@@ -61,4 +61,4 @@ Results on the AppWorld benchmark (457 APIs across 9 apps), achieving ~95% laten
 **Not a good fit:**
 - Your tool catalog changes every request
 - You have zero historical execution data (cold start)
-- Tool selection requires deep multi-step reasoning that can't be captured in features
+- Tool selection requires deep multi-span reasoning that can't be captured in features

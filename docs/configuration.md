@@ -20,7 +20,7 @@ ingest:
   field_map:                          # Map your log fields → ShortChain fields
     task_id: "task_id"
     intent: "intent"
-    steps: "steps"
+    spans: "spans"
     success: "success"
     agent_name: "agent_name"
     action: "action"
@@ -35,10 +35,10 @@ features:
   context_fields:                    # Context fields to extract
     - "intent"
     - "app_name"
-    - "n_steps"
+    - "n_spans"
     - "previous_tools"
     - "last_thought"
-  include_state_features: true       # step_index, last_action, last_observation,
+  include_state_features: true       # span_index, last_action, last_observation,
                                      # unique_tools_so_far, history_summary
   include_dependency_features: true  # tool_diversity, app_tool_count
 
@@ -152,7 +152,7 @@ ingest:
   field_map:
     task_id: "request_id"
     intent: "user_query"
-    steps: "execution_trace"
+    spans: "execution_trace"
     action: "function_call"
     observation: "function_result"
     thoughts: "chain_of_thought"

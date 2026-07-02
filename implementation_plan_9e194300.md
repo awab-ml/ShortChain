@@ -69,7 +69,7 @@ shortchain/
 ### 1. State-Aware Context Features
 Context features capture the agent's *current execution state*, not just the initial intent:
 - `intent` — user's original goal
-- `step_index` — current position in the execution plan
+- `span_index` — current position in the execution plan
 - `history_summary` — compact aggregation of prior actions and outcomes
 - `last_action` — most recent tool/API called
 - `last_observation` — result of the last action

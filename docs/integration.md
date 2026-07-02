@@ -65,10 +65,10 @@ engine = InferenceEngine(model_path="models/shortchain.pkl", top_k=5)
 
 def choose_tool(context: dict, tool_catalog: list[dict], llm) -> str:
     """ShortChain shortlists, LLM makes final decision."""
-    # Step 1: ShortChain narrows to top-5 (~1ms)
+    # Span 1: ShortChain narrows to top-5 (~1ms)
     shortlist = engine.predict(context, tool_catalog, top_k=5)
     
-    # Step 2: LLM picks from shortlist (cheaper — 5 tools, not 100+)
+    # Span 2: LLM picks from shortlist (cheaper — 5 tools, not 100+)
     shortlisted_tools = [
         {"name": name, "score": score} for name, score in shortlist
     ]
@@ -133,7 +133,7 @@ def choose_tool(context: dict, tool_catalog: list[dict], llm) -> str:
 
 ---
 
-## Step-by-Step Integration
+## Span-by-Span Integration
 
 ### 1. Collect Agent Logs
 
@@ -143,7 +143,7 @@ Your agent must log its execution traces. At minimum, each log entry needs:
 {
   "task_id": "unique_id",
   "intent": "what the user asked",
-  "steps": [
+  "spans": [
     {"action": "tool_name", "observation": "result"}
   ]
 }
@@ -161,7 +161,7 @@ ingest:
   field_map:
     task_id: "request_id"        # your field name → ShortChain field
     intent: "user_query"
-    steps: "execution_trace"
+    spans: "execution_trace"
     action: "function_call"
     observation: "function_result"
 ```
@@ -280,7 +280,7 @@ When calling `engine.predict()`, provide a context dict with these fields:
 |---|---|---|---|
 | `intent` | str | Yes | User's original goal |
 | `app_name` | str | Recommended | Application context |
-| `n_steps` | int | Recommended | Number of steps taken so far |
+| `n_spans` | int | Recommended | Number of spans taken so far |
 | `previous_tools` | str | Recommended | Pipe-separated tools used: `"search_contacts\|create_draft"` |
 | `last_thought` | str | Optional | Last agent reasoning trace |
 

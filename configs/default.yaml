@@ -8,7 +8,7 @@ ingest:
   field_map:                          # map your log fields to ShortChain schema
     task_id: "task_id"
     intent: "intent"
-    steps: "steps"
+    spans: "spans"
     success: "success"
     agent_name: "agent_name"
     action: "action"
@@ -22,10 +22,10 @@ features:
   context_fields:
     - "intent"
     - "app_name"
-    - "n_steps"
+    - "n_spans"
     - "previous_tools"
     - "last_thought"
-  include_state_features: true        # step_index, last_action, etc.
+  include_state_features: true        # span_index, last_action, etc.
   include_dependency_features: true   # tool_diversity, app_tool_count, etc.
 
 negatives:
@@ -42,7 +42,7 @@ dataset:
   context_fields:
     - "intent"
     - "app_name"
-    - "n_steps"
+    - "n_spans"
     - "previous_tools"
     - "last_thought"
   text_encoder: "tfidf"              # (legacy — prefer features.text_encoder)
@@ -88,6 +88,6 @@ evaluation:
 
 benchmark:
   adapter: "toolbench"                  # adapter name from registry
-  step_level: false                     # expand trajectories to per-step samples
+  span_level: false                     # expand trajectories to per-span samples
   use_failure_negatives: false          # augment training with failure negatives
   failure_negative_ratio: 0.3           # fraction of failure rows to inject

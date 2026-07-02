@@ -12,7 +12,7 @@ import pytest
 from shortchain.config import ClassifierConfig
 from shortchain.dataset.builder import build_dataset
 from shortchain.head.classifier import ShortChainClassifier
-from shortchain.ingest.schema import Step, Trajectory
+from shortchain.ingest.schema import Span, Trajectory
 
 
 # ---------------------------------------------------------------------------
@@ -27,7 +27,7 @@ def training_data() -> tuple[pd.DataFrame, pd.Series]:
             task_id=f"t{i}",
             intent=f"Task intent number {i} for {app}",
             app_name=app,
-            steps=[Step(action=t) for t in tools],
+            spans=[Span(action=t) for t in tools],
         )
         for i, (app, tools) in enumerate([
             ("gmail", ["search_contacts", "send_email"]),

@@ -54,7 +54,7 @@ class InferenceEngine:
         Parameters
         ----------
         context
-            Dict with keys: ``intent``, ``app_name``, ``n_steps``,
+            Dict with keys: ``intent``, ``app_name``, ``n_spans``,
             ``previous_tools``, ``last_thought``.
         candidates
             List of dicts with keys: ``tool_name``, ``tool_description``.

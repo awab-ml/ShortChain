@@ -1,6 +1,6 @@
 {
   "scenario": "G2",
-  "step_level": true,
+  "span_level": true,
   "use_failure_negatives": true,
   "n_success_trajectories": 49759,
   "n_failed_trajectories": 5769,
@@ -26,12 +26,12 @@
     "recall_at_10": 1.0,
     "pass_rate_at_10": 1.0
   },
-  "step_metrics": {
-    "step_0": 0.9560439560439561,
-    "step_1": 0.9902912621359223,
-    "step_2": 0.984375,
-    "step_3": 1.0,
-    "step_4": 0.9
+  "span_metrics": {
+    "span_0": 0.9560439560439561,
+    "span_1": 0.9902912621359223,
+    "span_2": 0.984375,
+    "span_3": 1.0,
+    "span_4": 0.9
   },
   "elapsed_seconds": 1228.1
 }

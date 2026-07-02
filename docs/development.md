@@ -83,7 +83,7 @@ tests/
 ```python
 # tests/test_my_module.py
 import pytest
-from shortchain.ingest.schema import Step, Trajectory
+from shortchain.ingest.schema import Span, Trajectory
 
 
 def _make_trajectory(**overrides) -> Trajectory:
@@ -93,9 +93,9 @@ def _make_trajectory(**overrides) -> Trajectory:
         "intent": "Test intent",
         "app_name": "testapp",
         "success": True,
-        "steps": [
-            Step(action="tool_a", observation="result_a"),
-            Step(action="tool_b", observation="result_b"),
+        "spans": [
+            Span(action="tool_a", observation="result_a"),
+            Span(action="tool_b", observation="result_b"),
         ],
     }
     defaults.update(overrides)
@@ -108,7 +108,7 @@ class TestMyFeature:
         # ...assert expected behavior...
     
     def test_edge_case_empty_input(self):
-        traj = _make_trajectory(steps=[])
+        traj = _make_trajectory(spans=[])
         # ...assert graceful handling...
 ```
 
@@ -329,5 +329,5 @@ Expected: all commands succeed, R-Precision ≥ 0.85, Recall@5 = 1.0 on example 
 | 2 — Features | Modular FeaturePipeline, negative sampling, encoders | ✅ Complete |
 | 3A — TabSchema | LLM-driven feature extraction (opt-in enhancement) | Planned |
 | 3B — TabSynth | Synthetic data generation for rare patterns | Planned |
-| 3C — Step-Level | Per-step decisions (experimental mode) | Planned |
+| 3C — Span-Level | Per-span decisions (experimental mode) | Planned |
 | 4 — Benchmarks | AppWorld adapter, real-world evaluation | Planned |

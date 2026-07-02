@@ -57,14 +57,14 @@ def main() -> None:
     cfg = load_config(args.config)
 
     # 1. Ingest trajectories
-    log.info(f"[bold]Step 1:[/bold] Loading trajectories from {args.trajectories}")
+    log.info(f"[bold]Span 1:[/bold] Loading trajectories from {args.trajectories}")
     trajectories = load_trajectories(args.trajectories, config=cfg.ingest)
     if not trajectories:
         log.error("No trajectories loaded. Check path and format.")
         return
 
     # 2. Build dataset
-    log.info("[bold]Step 2:[/bold] Building (context, tool, label) pairs")
+    log.info("[bold]Span 2:[/bold] Building (context, tool, label) pairs")
     builder = DatasetBuilder(config=cfg.dataset)
     df = builder.build(trajectories)
 
@@ -76,7 +76,7 @@ def main() -> None:
         df.to_csv(out_path, index=False)
         log.info(f"Saved full dataset to {out_path}")
     else:
-        log.info("[bold]Step 3:[/bold] Creating train/test split")
+        log.info("[bold]Span 3:[/bold] Creating train/test split")
         splitter = GroupStratifiedSplitter(cfg.splitter)
         train_df, test_df = splitter.train_test_split(df)
 

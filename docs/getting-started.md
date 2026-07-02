@@ -40,7 +40,7 @@ python scripts/evaluate.py \
 
 ## What Just Happened?
 
-### Step 1: Build Dataset
+### Span 1: Build Dataset
 
 The `build_dataset.py` script:
 
@@ -50,7 +50,7 @@ The `build_dataset.py` script:
 4. **Split** into train/test sets with no task leakage (all rows from one task stay in the same split)
 5. **Saved** `train.csv` and `test.csv` to `data/datasets/`
 
-### Step 2: Train
+### Span 2: Train
 
 The `train.py` script:
 
@@ -60,7 +60,7 @@ The `train.py` script:
 4. **Trained a final model** on all training data
 5. **Saved** the model to `models/shortchain.pkl` and CV results to `models/cv_results.json`
 
-### Step 3: Evaluate
+### Span 3: Evaluate
 
 The `evaluate.py` script:
 
@@ -96,7 +96,7 @@ ShortChain reads JSON or JSONL files. Each record represents one agent execution
   "intent": "Send an email to John about the meeting tomorrow at 3pm",
   "app_name": "gmail",
   "success": true,
-  "steps": [
+  "spans": [
     {
       "agent_name": "TaskAnalyzer",
       "thoughts": "User wants to compose and send an email.",
@@ -128,13 +128,13 @@ ShortChain reads JSON or JSONL files. Each record represents one agent execution
 **Required fields:**
 - `task_id` — unique identifier for this task
 - `intent` — the user's original goal (natural language)
-- `steps` — list of agent execution steps, each with at least an `action` field
+- `spans` — list of agent execution spans, each with at least an `action` field
 
 **Optional fields:**
 - `app_name` — application context (used for negative sampling and features)
 - `success` — whether the task completed successfully (default: `true`)
-- `steps[].thoughts` — agent reasoning trace (improves feature quality)
-- `steps[].observation` — result of the action
+- `spans[].thoughts` — agent reasoning trace (improves feature quality)
+- `spans[].observation` — result of the action
 
 ### Custom Field Names
 
@@ -146,7 +146,7 @@ ingest:
   field_map:
     task_id: "id"             # your field → ShortChain field
     intent: "instruction"
-    steps: "actions"
+    spans: "actions"
     success: "completed"
     action: "tool_call"
     observation: "result"
