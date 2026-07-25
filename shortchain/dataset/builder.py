@@ -20,7 +20,11 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from shortchain.config import DatasetConfig, FeaturesConfig, NegativeSamplingConfig
+from shortchain.config import (
+    DatasetConfig,
+    FeaturesConfig,
+    NegativeSamplingConfig,
+)
 from shortchain.dataset.negatives import NegativeSampler, create_sampler
 from shortchain.features.context import ContextFeatureBuilder
 from shortchain.features.stats import CorpusStats
