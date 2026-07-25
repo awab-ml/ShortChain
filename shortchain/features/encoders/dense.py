@@ -5,7 +5,7 @@ package is not installed or model loading fails.
 
 Install the optional dependency via::
 
-    pip install shortchain[embeddings]
+   uv  pip install shortchain[embeddings]
 """
 
 from __future__ import annotations
