@@ -1,0 +1,107 @@
+{
+  "benchmark": "toolbench",
+  "config": {
+    "span_level": false,
+    "use_failure_negatives": true
+  },
+  "cv_results": {
+    "fold_metrics": [
+      {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "auc": 1.0,
+        "r_precision": 1.0,
+        "recall_at_3": 0.8823988095238096,
+        "recall_at_5": 0.9694146825396825,
+        "recall_at_7": 0.9936805555555555,
+        "recall_at_9": 0.99875,
+        "fold": 1,
+        "train_time_s": 16.3
+      },
+      {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "auc": 1.0,
+        "r_precision": 1.0,
+        "recall_at_3": 0.8815631186234202,
+        "recall_at_5": 0.9688531039033552,
+        "recall_at_7": 0.9939152834881478,
+        "recall_at_9": 0.9990863407948835,
+        "fold": 2,
+        "train_time_s": 16.3
+      },
+      {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "auc": 1.0,
+        "r_precision": 1.0,
+        "recall_at_3": 0.8821249999999999,
+        "recall_at_5": 0.9689583333333335,
+        "recall_at_7": 0.9938750000000001,
+        "recall_at_9": 0.9990000000000001,
+        "fold": 3,
+        "train_time_s": 16.77
+      },
+      {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "auc": 1.0,
+        "r_precision": 1.0,
+        "recall_at_3": 0.8813333333333333,
+        "recall_at_5": 0.9697222222222223,
+        "recall_at_7": 0.9937777777777778,
+        "recall_at_9": 0.9995,
+        "fold": 4,
+        "train_time_s": 26.22
+      },
+      {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "auc": 1.0,
+        "r_precision": 1.0,
+        "recall_at_3": 0.8825238095238095,
+        "recall_at_5": 0.9696230158730159,
+        "recall_at_7": 0.9936388888888888,
+        "recall_at_9": 0.9995,
+        "fold": 5,
+        "train_time_s": 22.32
+      }
+    ],
+    "aggregate": {
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "auc": 1.0,
+      "r_precision": 1.0,
+      "recall_at_3": 0.8819888142008745,
+      "recall_at_5": 0.9693142715743219,
+      "recall_at_7": 0.993777501142074,
+      "recall_at_9": 0.9991672681589767
+    },
+    "training_time_s": 99.95
+  },
+  "test_metrics": {
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "auc": 1.0,
+    "r_precision": 1.0,
+    "recall_at_3": 0.776167748917749,
+    "recall_at_5": 0.9215295815295815,
+    "recall_at_7": 0.9803080808080809,
+    "recall_at_9": 0.9971818181818182
+  },
+  "total_time_s": 170.32
+}

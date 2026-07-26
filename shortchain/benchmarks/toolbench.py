@@ -99,7 +99,12 @@ class ToolBenchAdapter:
 
             raw = read_json(self.catalog_path)
             if isinstance(raw, dict):
-                self._catalog = {str(k): str(v) for k, v in raw.items()}
+                if "catalog" in raw and isinstance(raw["catalog"], dict):
+                    self._catalog = {str(k): str(v) for k, v in raw["catalog"].items()}
+                    if "category_map" in raw and isinstance(raw["category_map"], dict):
+                        self._category_map = {str(k): str(v) for k, v in raw["category_map"].items()}
+                else:
+                    self._catalog = {str(k): str(v) for k, v in raw.items()}
             elif isinstance(raw, list):
                 # List of {"name": ..., "description": ...} dicts
                 self._catalog = {

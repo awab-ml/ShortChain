@@ -1,0 +1,74 @@
+# ShortChain ToolBench Phase G1 Configuration
+# ============================================
+
+ingest:
+  format: "jsonl"
+  success_only: false                  # Ingest all trajectories (failures included)
+  field_map:
+    task_id: "task_id"
+    intent: "intent"
+    spans: "spans"
+    success: "success"
+    agent_name: "agent_name"
+    action: "action"
+    observation: "observation"
+    thoughts: "thoughts"
+
+features:
+  text_encoder: "tfidf"
+  tfidf_max_features: 5000
+  context_fields:
+    - "intent"
+    - "app_name"
+    - "n_spans"
+    - "previous_tools"
+    - "last_thought"
+  include_state_features: true
+  include_dependency_features: true
+
+negatives:
+  strategy: "hard"                    # Use hard negative sampling against real catalog
+  hard_negative_ratio: 0.5
+  same_app_weight: 0.4
+  co_usage_weight: 0.3
+  similarity_weight: 0.3
+
+dataset:
+  negative_ratio: 3                   # 3 negatives per positive sample
+
+splitter:
+  n_folds: 5
+  test_size: 0.2
+  group_by: "task_id"
+  stratify_by:
+    - "app_name"
+
+classifier:
+  model_type: "xgboost"
+  xgboost:
+    n_estimators: 300
+    max_depth: 8
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_weight: 3
+    eval_metric: "logloss"
+    early_stopping_rounds: 20
+
+inference:
+  top_k: 7
+  confidence_threshold: 0.5
+
+evaluation:
+  k_values: [3, 5, 7, 9]
+  metrics:
+    - "r_precision"
+    - "recall_at_k"
+    - "accuracy"
+    - "f1"
+
+benchmark:
+  adapter: "toolbench"
+  span_level: false
+  use_failure_negatives: true         # Enable failure-negative augmentation
+  failure_negative_ratio: 0.3
