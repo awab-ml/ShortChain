@@ -8,8 +8,10 @@ Provides pluggable strategies for selecting negative (label=0) tools:
 
 Use ``create_sampler()`` as the factory entry-point.
 """
-
 from __future__ import annotations
+from pandas import plotting
+
+
 
 import random
 from typing import Any
@@ -78,8 +80,7 @@ class RandomSampler(NegativeSampler):
         self,
         positive_tools: set[str],
         app_name: str,
-        n: int,
-    ) -> list[str]:
+        n: int,):
         pool = [t for t in self.catalog if t not in positive_tools]
         k = min(len(pool), n)
         if k == 0:
