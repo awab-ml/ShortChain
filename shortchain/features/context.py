@@ -87,6 +87,9 @@ class ContextFeatureBuilder:
 
         return features
 
+
+    #include_state:
+       # Whether to include state-aware features (span_index, last_action, etc.)
     def _state_features(self, traj: Any, span_index: int | None) -> dict[str, Any]:
         """Extract state-aware features."""
         features: dict[str, Any] = {}
@@ -118,6 +121,8 @@ class ContextFeatureBuilder:
 
         return features
 
+     #include_dependencies
+         #Whether to include dependency features (tool_diversity, etc.).
     def _dependency_features(
         self, traj: Any, span_index: int | None
     ) -> dict[str, Any]:
