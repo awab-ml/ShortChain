@@ -70,11 +70,6 @@ ShortChain/                          (3,508 lines Python)
 │   ├── evaluation/                           LAYER 7: Evaluation
 │   │   └── metrics.py                (188)   R-Precision, Recall@k, F1, AUC
 │   │
-│   ├── benchmarks/                           ADAPTER LAYER (new)
-│   │   ├── adapter.py                 (82)   BenchmarkAdapter protocol
-│   │   ├── toolbench.py              (250)   ToolBenchAdapter
-│   │   └── __init__.py                (87)   Registry + create_adapter()
-│   │
 │   └── utils/
 │       ├── io.py                      (64)   JSON/JSONL read/write helpers
 │       └── logging.py                 (71)   Rich-based structured logging
@@ -82,18 +77,15 @@ ShortChain/                          (3,508 lines Python)
 ├── scripts/
 │   ├── build_dataset.py               (95)   CLI: trajectories → dataset CSV
 │   ├── train.py                      (112)   CLI: dataset → trained model
-│   ├── evaluate.py                   (103)   CLI: model + test set → metrics
-│   ├── run_benchmark.py              (210)   CLI: generic benchmark runner
-│   └── benchmark_toolbench.py         (75)   CLI: deprecated shim
+│   └── evaluate.py                   (103)   CLI: model + test set → metrics
 │
-├── tests/                                    131 tests, ~13s
+├── tests/                                    100 tests, ~13s
 │   ├── test_ingest.py                        Schema + loader tests
 │   ├── test_dataset.py                       Builder + integration tests
 │   ├── test_features.py                      Pipeline + encoder tests
 │   ├── test_classifier.py                    Classifier fit/predict/save/load
 │   ├── test_metrics.py                       R-precision, Recall@k
-│   ├── test_negatives.py                     Sampling strategies
-│   └── test_benchmark_adapter.py             Adapter protocol + registry
+│   └── test_negatives.py                     Sampling strategies
 │
 └── configs/
     └── default.yaml                   (95)   Complete default configuration
@@ -405,27 +397,6 @@ class BenchmarkAdapter(Protocol):
 
 Every benchmark implements this. The core pipeline never sees benchmark-specific types.
 
-#### [toolbench.py](file:///Users/awabmelayem/Downloads/ShortChain/shortchain/benchmarks/toolbench.py) — ToolBenchAdapter
-
-Wraps the existing `JSONLTrajectoryLoader` behind the protocol. Handles:
-- **Catalog loading** — from JSON file or derived from trajectories
-- **Train/test splitting** — separates success/failure, caches failures
-- **Step-level expansion** — delegates to `shortchain.data.transforms.expand_to_step_trajectories()`
-- **Failure-negative augmentation** — injects failed trajectory tools as extra negatives
-
-#### [\_\_init\_\_.py](file:///Users/awabmelayem/Downloads/ShortChain/shortchain/benchmarks/__init__.py) — Registry
-
-```python
-ADAPTERS = {
-    "toolbench": "shortchain.benchmarks.toolbench:ToolBenchAdapter",
-    # "apibank": "shortchain.benchmarks.apibank:APIBankAdapter",
-}
-
-adapter = create_adapter("toolbench", config, train_path=..., eval_path=...)
-```
-
-**Lazy imports** — adapter modules aren't loaded until `create_adapter()` is called, so importing `shortchain` stays lightweight.
-
 ---
 
 ### Configuration (`shortchain/config.py`)
@@ -470,10 +441,8 @@ benchmark:
 | [build_dataset.py](file:///Users/awabmelayem/Downloads/ShortChain/scripts/build_dataset.py) | Trajectories → CSV dataset | `--trajectories data/ --output data/datasets/` |
 | [train.py](file:///Users/awabmelayem/Downloads/ShortChain/scripts/train.py) | CSV dataset → trained model | `--dataset data/datasets/ --model xgboost` |
 | [evaluate.py](file:///Users/awabmelayem/Downloads/ShortChain/scripts/evaluate.py) | Model + test CSV → metrics | `--model models/shortchain.pkl --dataset test.csv` |
-| [run_benchmark.py](file:///Users/awabmelayem/Downloads/ShortChain/scripts/run_benchmark.py) | End-to-end benchmark run | `--benchmark toolbench --train-path ... --eval-path ...` |
-| [benchmark_toolbench.py](file:///Users/awabmelayem/Downloads/ShortChain/scripts/benchmark_toolbench.py) | ⚠️ Deprecated shim | Warns + delegates to `run_benchmark.py` |
 
-The first three scripts are **modular** — you can run each stage independently. `run_benchmark.py` runs all stages in one shot via the adapter architecture.
+These scripts are **modular** — you can run each stage independently.
 
 ---
 
@@ -481,14 +450,13 @@ The first three scripts are **modular** — you can run each stage independently
 
 | File | Tests | What it covers |
 |---|---|---|
-| `test_ingest.py` | 15 | Step tool_name parsing, Trajectory auto-derivation, JSONL loading, field mapping |
+| `test_ingest.py` | 15 | Span tool_name parsing, Trajectory auto-derivation, JSONL loading, field mapping |
 | `test_dataset.py` | 14 | DatasetBuilder pairs, positive/negative ratios, catalog derivation |
 | `test_features.py` | 21 | FeaturePipeline fit/transform, TF-IDF/dense encoding, save/load roundtrip |
 | `test_classifier.py` | 14 | ShortChainClassifier fit/predict, binary mode, shortlist, save/load |
 | `test_metrics.py` | 8 | R-precision, Recall@k edge cases, compute_metrics integration |
 | `test_negatives.py` | 14 | Random/Hard/Mixed sampling, determinism, no-overlap guarantees |
-| `test_benchmark_adapter.py` | 31 | Step expansion, protocol compliance, ToolBenchAdapter lifecycle, registry |
-| **Total** | **131** | **~13 seconds** |
+| **Total** | **86** | **~13 seconds** |
 
 ---
 
@@ -497,24 +465,15 @@ The first three scripts are **modular** — you can run each stage independently
 ```mermaid
 sequenceDiagram
     participant User
-    participant Adapter as ToolBenchAdapter
     participant Builder as DatasetBuilder
     participant Pipeline as FeaturePipeline
     participant Trainer
     participant Classifier as ShortChainClassifier
 
-    User->>Adapter: load_trajectories("train")
-    Adapter->>Adapter: Load JSONL → filter success/fail
-    Adapter->>Adapter: expand_to_step_trajectories() (if step_level)
-    Adapter-->>User: list[Trajectory]
-
     User->>Builder: build(trajectories)
     Builder->>Builder: Compute CorpusStats
     Builder->>Builder: For each traj: positives + negatives
     Builder-->>User: train_df (context + tool + label)
-
-    User->>Adapter: augment_training(train_df)
-    Adapter-->>User: train_df + failure negatives
 
     User->>Trainer: train_with_cv(train_df)
     Trainer->>Classifier: fit(X_train, y_train)
@@ -532,12 +491,10 @@ sequenceDiagram
 
 1. **Trajectory is the universal contract** — every module operates on `Trajectory` objects, never on raw JSON. This makes the system dataset-agnostic.
 
-2. **Protocol-based extensibility** — `TrajectoryLoader`, `BenchmarkAdapter`, `TextEncoder` are all `@runtime_checkable Protocol`s. No ABCs, no inheritance trees.
+2. **Protocol-based extensibility** — `TrajectoryLoader`, `TextEncoder` are `@runtime_checkable Protocol`s. No ABCs, no inheritance trees.
 
-3. **Config-driven behavior** — 11 Pydantic models with sensible defaults. Override via YAML, no code changes needed.
+3. **Config-driven behavior** — Pydantic models with sensible defaults. Override via YAML, no code changes needed.
 
-4. **Zero coupling between layers** — `DatasetBuilder` knows nothing about ToolBench. `FeaturePipeline` knows nothing about XGBoost. `Trainer` knows nothing about trajectories.
+4. **Zero coupling between layers** — `DatasetBuilder` knows nothing about specific benchmarks. `FeaturePipeline` knows nothing about XGBoost. `Trainer` knows nothing about trajectories.
 
 5. **Graceful degradation** — Dense encoder falls back to TF-IDF if `sentence-transformers` isn't installed. Legacy v1 models still load. Missing feature columns are silently skipped.
-
-6. **Adapter pattern for benchmarks** — benchmark-specific logic (catalog format, step expansion, failure negatives) lives in adapters. The core pipeline stays generic.
