@@ -1,12 +1,19 @@
 """Feature pipeline orchestrator for ShortChain.
 
-``FeaturePipeline`` is the single entry-point for transforming raw
-feature dictionaries or DataFrames into the numeric matrix consumed
-by the classifier.  It replaces the inline encoding logic previously
-baked into ``classifier.py``.
+This module provides the ``FeaturePipeline`` class, which acts as the primary orchestrator
+for feature extraction, transformation, and encoding. It converts heterogeneous raw input
+data (text fields, numerical features, boolean flags, and categorical variables) into a
+dense numeric NumPy matrix ready for consumption by machine learning estimators.
 
-Accepts **both** ``pd.DataFrame`` and ``list[dict]`` as input for
-production flexibility.
+Key Features:
+-------------
+- **Input Flexibility**: Accepts both ``pd.DataFrame`` instances and list-of-dictionary records.
+- **Multi-Modal Encoding**:
+  - Text: Vectorized dynamically using TF-IDF or transformer-based embeddings via ``create_encoder``.
+  - Categoricals: Encoded via scikit-learn's ``LabelEncoder`` with unknown handling.
+  - Numerics: Parsed, cleaned, imputed with 0, and passed through as float32 matrices.
+  - Booleans: Formatted directly into 0.0/1.0 float32 arrays.
+- **Serialization**: Full pickle-based save and load support for production persistence.
 """
 
 from __future__ import annotations
@@ -25,7 +32,11 @@ from shortchain.utils.logging import get_logger
 
 log = get_logger(__name__)
 
-# Text columns that get encoded via the text encoder
+# ------------------------------------------------------------------
+# Schema Column Definitions
+# ------------------------------------------------------------------
+
+# Text columns processed via text encoding strategy (e.g., TF-IDF or embeddings)
 _TEXT_COLS = [
     "intent",
     "previous_tools",
@@ -36,7 +47,7 @@ _TEXT_COLS = [
     "last_observation",
 ]
 
-# Numeric columns passed through directly
+# Numeric columns passed through directly after cleaning and missing-value imputation
 _NUM_COLS = [
     "n_spans",
     "span_index",
@@ -48,23 +59,39 @@ _NUM_COLS = [
     "tool_co_occurrence",
 ]
 
-# Boolean columns converted to 0/1
+# Boolean flags converted to binary float representations (0.0 / 1.0)
 _BOOL_COLS = [
     "has_description",
     "tool_app_match",
 ]
 
-# Categorical columns that get label-encoded
+# Categorical variables encoded using integer label encoding
 _CAT_COLS = ["app_name"]
 
 
 class FeaturePipeline:
-    """Orchestrates feature extraction and encoding.
+    """Orchestrates multi-modal feature extraction, transformation, and vectorization.
+
+    Handles text vectorization, categorical label encoding, numeric parsing, and boolean
+    casting across raw DataFrames or list-of-dict representations.
+
+    Attributes
+    ----------
+    config : FeaturesConfig
+        Pipeline configuration governing encoder selection and hyperparameters.
+    _encoders : dict[str, Any]
+        Fitted text encoder instances keyed by column name.
+    _label_encoders : dict[str, LabelEncoder]
+        Fitted LabelEncoder instances keyed by categorical column name.
+    _skipped_text_cols : set[str]
+        Set of text columns skipped during fitting due to empty vocabularies or errors.
+    _is_fitted : bool
+        Flag indicating whether the pipeline has been fitted and is ready for transform.
 
     Parameters
     ----------
-    config
-        Feature pipeline configuration.
+    config : FeaturesConfig | None, optional
+        Feature pipeline configuration object. Defaults to a fresh ``FeaturesConfig()`` if None.
     """
 
     def __init__(self, config: FeaturesConfig | None = None) -> None:
@@ -79,22 +106,31 @@ class FeaturePipeline:
     # ------------------------------------------------------------------
 
     def fit_transform(self, data: pd.DataFrame | list[dict]) -> np.ndarray:
-        """Fit the pipeline on *data* and return encoded features.
+        """Fit feature encoders on raw input data and return the encoded feature matrix.
+
+        Iterates through schema-defined text, categorical, numerical, and boolean columns,
+        fits corresponding encoders, and horizontally stacks transformed outputs into a
+        single dense 2D matrix.
 
         Parameters
         ----------
-        data
-            Raw feature data as a DataFrame or list of dicts.
+        data : pd.DataFrame | list[dict]
+            Raw input dataset containing feature columns.
 
         Returns
         -------
         np.ndarray
-            Encoded feature matrix of shape ``(n_samples, n_features)``.
+            A 2D dense float32 array of shape ``(n_samples, n_features)``.
+
+        Raises
+        ------
+        ValueError
+            If no valid columns from the feature schema are present in the input.
         """
         df = self._to_dataframe(data)
         parts: list[np.ndarray] = []
 
-        # Text columns → encoder
+        # 1. Process Text Columns: Instantiate, fit, and transform text encoders
         for col in _TEXT_COLS:
             if col not in df.columns:
                 continue
@@ -112,7 +148,7 @@ class FeaturePipeline:
                 log.debug(f"Skipping encoder for column '{col}' (empty vocabulary)")
                 self._skipped_text_cols.add(col)
 
-        # Categorical → label encoding
+        # 2. Process Categorical Columns: Fit LabelEncoder and reshape to column vector
         for col in _CAT_COLS:
             if col not in df.columns:
                 continue
@@ -122,20 +158,21 @@ class FeaturePipeline:
             self._label_encoders[col] = le
             parts.append(encoded)
 
-        # Numeric columns
+        # 3. Process Numeric Columns: Cast to numeric, handle NaNs, reshape to column vector
         for col in _NUM_COLS:
             if col not in df.columns:
                 continue
             vals = pd.to_numeric(df[col], errors="coerce").fillna(0)
             parts.append(vals.values.reshape(-1, 1).astype(np.float32))
 
-        # Boolean columns
+        # 4. Process Boolean Columns: Convert boolean flags to binary float32 values
         for col in _BOOL_COLS:
             if col not in df.columns:
                 continue
             vals = df[col].astype(int).values.reshape(-1, 1).astype(np.float32)
             parts.append(vals)
 
+        # Verify that at least one feature column was successfully encoded
         if not parts:
             raise ValueError("No features to encode — check column names")
 
@@ -143,23 +180,30 @@ class FeaturePipeline:
         return np.hstack(parts)
 
     def transform(self, data: pd.DataFrame | list[dict]) -> np.ndarray:
-        """Transform new data using fitted encoders.
+        """Transform raw input data using previously fitted encoders.
 
         Parameters
         ----------
-        data
-            Raw feature data.
+        data : pd.DataFrame | list[dict]
+            Raw input dataset containing feature columns.
 
         Returns
         -------
         np.ndarray
-            Encoded feature matrix.
+            A 2D dense float32 array of shape ``(n_samples, n_features)``.
+
+        Raises
+        ------
+        RuntimeError
+            If called before the pipeline has been fitted.
+        ValueError
+            If no valid features could be constructed from input columns.
         """
         self._check_fitted()
         df = self._to_dataframe(data)
         parts: list[np.ndarray] = []
 
-        # Text columns
+        # 1. Transform Text Columns using stored encoder state
         for col in _TEXT_COLS:
             if col not in self._encoders:
                 continue
@@ -167,7 +211,7 @@ class FeaturePipeline:
             texts = df[col].fillna("").astype(str).tolist()
             parts.append(enc.transform(texts))
 
-        # Categorical
+        # 2. Transform Categorical Columns handling unknown levels cleanly (-1)
         for col in _CAT_COLS:
             if col not in self._label_encoders:
                 continue
@@ -179,14 +223,14 @@ class FeaturePipeline:
             ).reshape(-1, 1)
             parts.append(encoded)
 
-        # Numeric columns
+        # 3. Transform Numeric Columns
         for col in _NUM_COLS:
             if col not in df.columns:
                 continue
             vals = pd.to_numeric(df[col], errors="coerce").fillna(0)
             parts.append(vals.values.reshape(-1, 1).astype(np.float32))
 
-        # Boolean columns
+        # 4. Transform Boolean Columns
         for col in _BOOL_COLS:
             if col not in df.columns:
                 continue
@@ -199,7 +243,18 @@ class FeaturePipeline:
         return np.hstack(parts)
 
     def save(self, path: str | Path) -> None:
-        """Persist the fitted pipeline (pickle)."""
+        """Serialize and save the fitted pipeline state to disk via pickle.
+
+        Parameters
+        ----------
+        path : str | Path
+            Destination filepath for the saved artifact.
+
+        Raises
+        ------
+        RuntimeError
+            If attempting to save an unfitted pipeline instance.
+        """
         self._check_fitted()
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -215,7 +270,18 @@ class FeaturePipeline:
 
     @classmethod
     def load(cls, path: str | Path) -> "FeaturePipeline":
-        """Load a fitted pipeline from disk."""
+        """Load a persisted FeaturePipeline instance from a pickle file.
+
+        Parameters
+        ----------
+        path : str | Path
+            Filepath of the saved pipeline pickle object.
+
+        Returns
+        -------
+        FeaturePipeline
+            Reconstructed pipeline instance with fitted encoders restored.
+        """
         with open(path, "rb") as f:
             state = pickle.load(f)
         config = FeaturesConfig.model_validate(state["config"])
@@ -233,7 +299,23 @@ class FeaturePipeline:
 
     @staticmethod
     def _to_dataframe(data: pd.DataFrame | list[dict]) -> pd.DataFrame:
-        """Normalise input to DataFrame."""
+        """Standardize raw input types to a pandas DataFrame.
+
+        Parameters
+        ----------
+        data : pd.DataFrame | list[dict]
+            Input data represented as a DataFrame or a list of dictionaries.
+
+        Returns
+        -------
+        pd.DataFrame
+            Normalized pandas DataFrame representation.
+
+        Raises
+        ------
+        TypeError
+            If data is neither a pandas DataFrame nor a list of dictionaries.
+        """
         if isinstance(data, pd.DataFrame):
             return data
         if isinstance(data, list):
@@ -241,6 +323,13 @@ class FeaturePipeline:
         raise TypeError(f"Expected DataFrame or list[dict], got {type(data)}")
 
     def _check_fitted(self) -> None:
+        """Verify that the feature pipeline has been fitted prior to transform or save.
+
+        Raises
+        ------
+        RuntimeError
+            If ``_is_fitted`` is False.
+        """
         if not self._is_fitted:
             raise RuntimeError(
                 "FeaturePipeline has not been fitted. Call .fit_transform() first."
