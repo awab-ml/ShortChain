@@ -90,7 +90,7 @@ class DatasetConfig(BaseModel):
 class SplitterConfig(BaseModel):
     """Train/test splitting settings."""
 
-    n_folds: int = 5
+    n_folds: int = 10
     test_size: float = 0.2
     group_by: str = "task_id"
     stratify_by: list[str] = Field(default_factory=lambda: ["app_name"])
@@ -99,7 +99,7 @@ class SplitterConfig(BaseModel):
 class XGBoostParams(BaseModel):
     """XGBoost hyper-parameters."""
 
-    n_estimators: int = 300
+    n_estimators: int = 300 
     max_depth: int = 8
     learning_rate: float = 0.1
     subsample: float = 0.8

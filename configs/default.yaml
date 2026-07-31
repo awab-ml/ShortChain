@@ -3,9 +3,9 @@
 # Override any setting via CLI flags or by creating a custom YAML config.
 
 ingest:
-  format: "jsonl"                     # json | jsonl
-  success_only: true                  # filter to successful trajectories
-  field_map:                          # map your log fields to ShortChain schema
+  format: "jsonl" # json | jsonl
+  success_only: true # filter to successful trajectories
+  field_map: # map your log fields to ShortChain schema
     task_id: "task_id"
     intent: "intent"
     spans: "spans"
@@ -16,7 +16,7 @@ ingest:
     thoughts: "thoughts"
 
 features:
-  text_encoder: "tfidf"              # tfidf | e5-small | auto
+  text_encoder: "tfidf" # tfidf | e5-small | auto
   e5_model_name: "intfloat/e5-small-v2"
   tfidf_max_features: 5000
   context_fields:
@@ -25,38 +25,38 @@ features:
     - "n_spans"
     - "previous_tools"
     - "last_thought"
-  include_state_features: true        # span_index, last_action, etc.
-  include_dependency_features: true   # tool_diversity, app_tool_count, etc.
+  include_state_features: true # span_index, last_action, etc.
+  include_dependency_features: true # tool_diversity, app_tool_count, etc.
 
 negatives:
-  strategy: "random"                  # random | hard | mixed
-  hard_negative_ratio: 0.5           # fraction of hard negs in mixed mode
-  same_app_weight: 0.4               # weight for same-app hard negatives
-  co_usage_weight: 0.3               # weight for co-usage hard negatives
-  similarity_weight: 0.3             # weight for description-similar negatives
+  strategy: "random" # random | hard | mixed
+  hard_negative_ratio: 0.5 # fraction of hard negs in mixed mode
+  same_app_weight: 0.4 # weight for same-app hard negatives
+  co_usage_weight: 0.3 # weight for co-usage hard negatives
+  similarity_weight: 0.3 # weight for description-similar negatives
   # random_state: 42                 # uncomment for reproducible sampling
 
 dataset:
-  negative_ratio: 3                   # negatives per positive sample
-  negative_strategy: "random"         # (legacy — prefer negatives.strategy)
+  negative_ratio: 3 # negatives per positive sample
+  negative_strategy: "random" # (legacy — prefer negatives.strategy)
   context_fields:
     - "intent"
     - "app_name"
     - "n_spans"
     - "previous_tools"
     - "last_thought"
-  text_encoder: "tfidf"              # (legacy — prefer features.text_encoder)
+  text_encoder: "tfidf" # (legacy — prefer features.text_encoder)
   tfidf_max_features: 5000
 
 splitter:
-  n_folds: 5
+  n_folds: 10
   test_size: 0.2
   group_by: "task_id"
   stratify_by:
     - "app_name"
 
 classifier:
-  model_type: "xgboost"              # xgboost | random_forest | logistic
+  model_type: "xgboost" # xgboost | random_forest | logistic
   xgboost:
     n_estimators: 300
     max_depth: 8
@@ -75,8 +75,8 @@ classifier:
     max_iter: 1000
 
 inference:
-  top_k: 7                           # default shortlist size
-  confidence_threshold: 0.5          # for multi-label thresholding
+  top_k: 7 # default shortlist size
+  confidence_threshold: 0.5 # for multi-label thresholding
 
 evaluation:
   k_values: [3, 5, 7, 9]
@@ -87,7 +87,7 @@ evaluation:
     - "f1"
 
 benchmark:
-  adapter: "toolbench"                  # adapter name from registry
-  span_level: false                     # expand trajectories to per-span samples
-  use_failure_negatives: false          # augment training with failure negatives
-  failure_negative_ratio: 0.3           # fraction of failure rows to inject
+  adapter: "toolbench" # adapter name from registry
+  span_level: false # expand trajectories to per-span samples
+  use_failure_negatives: false # augment training with failure negatives
+  failure_negative_ratio: 0.3 # fraction of failure rows to inject
