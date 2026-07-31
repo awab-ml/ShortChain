@@ -35,7 +35,7 @@ class JSONLTrajectoryLoader:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-
+    #the managment function for "_load_directory" and "_load_file"
     def load(self, path: str | Path) -> list[Trajectory]:
         """Load trajectories from a file or directory.
 
@@ -96,7 +96,7 @@ class JSONLTrajectoryLoader:
 
         trajectories: list[Trajectory] = []
         for i, record in enumerate(raw_records):
-            try:
+            try: 
                 traj = self._parse_record(record)
                 if self.config.success_only and not traj.success:
                     continue

@@ -44,9 +44,7 @@ class Trajectory(BaseModel):
     success: bool = True
     app_name: str = ""                              # application context
     metadata: dict[str, Any] = Field(default_factory=dict)
-
-    # Derived fields (populated by validator)
-    tools_used: set[str] = Field(default_factory=set)
+    tools_used: set[str] = Field(default_factory=set) # Derived fields (populated by validator)
 
     @model_validator(mode="after")
     def _derive_tools_used(self) -> "Trajectory":
