@@ -145,10 +145,10 @@ class TestContextFeatureBuilder(unittest.TestCase):
         self.assertIn("app_tool_count", features)
 
     def test_span_index_none_default(self):
-        """span_index=None gives trajectory-level features."""
+        """span_index=None gives pre-execution features (no lookahead)."""
         features = self.builder.build(self.trajs[0], span_index=None)
-        self.assertEqual(features["n_spans"], 2)
-        self.assertEqual(features["span_index"], 2)  # final position
+        self.assertEqual(features["n_spans"], 0)
+        self.assertEqual(features["span_index"], 0)  # pre-execution
 
     def test_span_index_specific(self):
         """span_index=0 gives features up to span 0."""

@@ -129,8 +129,8 @@ class TestDatasetBuilder:
         df = build_dataset(sample_trajectories, tool_catalog=tool_catalog)
         # Intent should never be empty for our test data
         assert (df["intent"] != "").all()
-        # n_spans should be > 0
-        assert (df["n_spans"] > 0).all()
+        # n_spans is 0 at pre-execution (no lookahead leakage)
+        assert (df["n_spans"] >= 0).all()
 
 
 # ---------------------------------------------------------------------------
