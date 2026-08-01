@@ -105,6 +105,24 @@ class DatasetBuilder:
             )
 
         df = pd.DataFrame(rows)
+
+        # --- Leakage guard ---
+        if "previous_tools" in df.columns:
+            negatives = df[df["label"] == 0]
+            if len(negatives) > 0:
+                leaked = negatives.apply(
+                    lambda r: (
+                        bool(r.get("previous_tools"))
+                        and str(r["tool_name"]) in str(r["previous_tools"])
+                    ),
+                    axis=1,
+                )
+                if leaked.any():
+                    raise ValueError(
+                        f"TARGET LEAKAGE: {leaked.sum()} negative samples "
+                        f"contain tool_name in previous_tools"
+                    )
+
         pos = int(df["label"].sum())
         neg = len(df) - pos
         log.info(

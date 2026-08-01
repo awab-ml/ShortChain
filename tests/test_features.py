@@ -149,12 +149,15 @@ class TestContextFeatureBuilder(unittest.TestCase):
         features = self.builder.build(self.trajs[0], span_index=None)
         self.assertEqual(features["n_spans"], 0)
         self.assertEqual(features["span_index"], 0)  # pre-execution
+        self.assertEqual(features["previous_tools"], "")
+        self.assertEqual(features["last_action"], "")
+        self.assertEqual(features["tool_diversity"], 0.0)
 
     def test_span_index_specific(self):
-        """span_index=0 gives features up to span 0."""
-        features = self.builder.build(self.trajs[0], span_index=0)
-        self.assertEqual(features["n_spans"], 1)
-        self.assertEqual(features["span_index"], 0)
+        """span_index=1 gives features from span 0 only (prior history)."""
+        features = self.builder.build(self.trajs[0], span_index=1)
+        self.assertEqual(features["n_spans"], 1)     # 1 prior span
+        self.assertEqual(features["span_index"], 1)  # predicting step 1
 
     def test_state_disabled(self):
         builder = ContextFeatureBuilder(include_state=False, include_dependencies=True)

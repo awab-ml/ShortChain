@@ -132,6 +132,19 @@ class TestDatasetBuilder:
         # n_spans is 0 at pre-execution (no lookahead leakage)
         assert (df["n_spans"] >= 0).all()
 
+    def test_no_target_lookahead_leakage(self, sample_trajectories, tool_catalog):
+        """Negative samples must never contain the candidate tool in previous_tools."""
+        df = build_dataset(sample_trajectories, tool_catalog=tool_catalog)
+        negatives = df[df["label"] == 0]
+        for _, row in negatives.iterrows():
+            prev = str(row.get("previous_tools", ""))
+            if prev:
+                prev_tools = [t.strip() for t in prev.split("|")]
+                assert row["tool_name"] not in prev_tools, (
+                    f"Leakage: tool '{row['tool_name']}' found in "
+                    f"previous_tools for negative sample (task={row['task_id']})"
+                )
+
 
 # ---------------------------------------------------------------------------
 # GroupStratifiedSplitter tests
