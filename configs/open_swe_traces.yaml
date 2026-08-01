@@ -1,0 +1,81 @@
+# Open-SWE-Traces Configuration
+# ================================
+# Specialized config for nvidia/Open-SWE-Traces software engineering traces.
+# Uses field mappings suited to the SWE-agent / OpenHands trajectory format
+# after conversion by scripts/fetch_hf_traces.py.
+
+ingest:
+  format: "jsonl"
+  success_only: true
+  field_map:
+    task_id: "task_id"
+    intent: "intent"
+    spans: "spans"
+    success: "success"
+    agent_name: "agent_name"
+    action: "action"
+    observation: "observation"
+    thoughts: "thoughts"
+
+features:
+  text_encoder: "tfidf"
+  tfidf_max_features: 5000 # higher than default — richer SWE vocabulary
+  context_fields:
+    - "intent"
+    - "app_name"
+    - "n_spans"
+    - "previous_tools"
+    - "last_thought"
+  include_state_features: true
+  include_dependency_features: true
+
+negatives:
+  strategy: "mixed"
+  hard_negative_ratio: 0.5
+  same_app_weight: 0.4 # same-repo tool weighting
+  co_usage_weight: 0.3
+  similarity_weight: 0.3
+  random_state: 42 # reproducible sampling
+
+dataset:
+  negative_ratio: 3
+  negative_strategy: "mixed"
+  context_fields:
+    - "intent"
+    - "app_name"
+    - "n_spans"
+    - "previous_tools"
+    - "last_thought"
+  text_encoder: "tfidf"
+  tfidf_max_features: 10000
+
+splitter:
+  n_folds: 10
+  test_size: 0.2
+  group_by: "task_id"
+  stratify_by:
+    - "app_name"
+
+classifier:
+  model_type: "xgboost"
+  xgboost:
+    n_estimators: 300
+    max_depth: 8
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_weight: 3
+    eval_metric: "logloss"
+    early_stopping_rounds: 20
+
+inference:
+  top_k: 5
+  confidence_threshold: 0.5
+
+evaluation:
+  k_values: [1, 3, 5, 7]
+  metrics:
+    - "r_precision"
+    - "recall_at_k"
+    - "accuracy"
+    - "f1"
