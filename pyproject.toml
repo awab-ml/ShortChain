@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "shortchain"
-version = "0.1.0"
+version = "0.0.2"
 description = "Replace expensive LLM decision components in agentic systems with compact tabular-textual classifiers."
 readme = "README.md"
 license = {text = "MIT"}
