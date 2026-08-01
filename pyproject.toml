@@ -28,6 +28,11 @@ dependencies = [
 embeddings = [
     "sentence-transformers>=5.4.1",
 ]
+datasets = [
+    "datasets>=3.0",
+    "pyarrow>=14.0",
+    "huggingface-hub>=0.20",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
