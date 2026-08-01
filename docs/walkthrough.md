@@ -2,7 +2,7 @@
 
 > Replace expensive LLM decision components in agentic systems with compact tabular-textual classifiers (~1ms inference vs 500–2000ms LLM calls).
 
-**3,508 lines of Python** across 32 modules · **131 tests** · Based on [Levy et al., 2026](https://arxiv.org/abs/2602.16429)
+**4,874 lines of Python** across 29 modules · **100 tests** · Based on [Levy et al., 2026](https://arxiv.org/abs/2602.16429)
 
 ---
 
@@ -18,9 +18,6 @@ graph LR
     F --> G["L6: Classification<br/><i>XGB / RF / LR</i>"]
     G --> H["L7: Evaluation<br/><i>R-Precision, Recall@k</i>"]
 
-    I["Benchmark Adapter<br/><i>shortchain/benchmarks/</i>"] --> B
-    I --> E
-
     J["Config<br/><i>shortchain/config.py</i>"] -.-> B
     J -.-> D
     J -.-> F
@@ -34,13 +31,13 @@ The pipeline has **seven layers**, each cleanly separated. Data flows left-to-ri
 ## Directory Structure
 
 ```
-ShortChain/                          (3,508 lines Python)
+ShortChain/                          (4,874 lines Python)
 ├── shortchain/
 │   ├── __init__.py                     (3)   Version tag
-│   ├── config.py                     (236)   11 Pydantic config models + YAML loader
+│   ├── config.py                     (221)   9 Pydantic config models + YAML loader
 │   │
 │   ├── ingest/                               LAYER 1: Ingestion
-│   │   ├── schema.py                  (90)   Step + Trajectory dataclasses
+│   │   ├── schema.py                  (88)   Step + Trajectory dataclasses
 │   │   ├── base.py                    (28)   TrajectoryLoader protocol
 │   │   └── loader.py                 (176)   JSONLTrajectoryLoader + field mapping
 │   │
@@ -49,21 +46,21 @@ ShortChain/                          (3,508 lines Python)
 │   │
 │   ├── features/                             LAYER 3: Feature Extraction
 │   │   ├── stats.py                   (88)   CorpusStats (frequencies, co-occurrence)
-│   │   ├── context.py                (156)   ContextFeatureBuilder (state + dependency)
+│   │   ├── context.py                (161)   ContextFeatureBuilder (state + dependency)
 │   │   ├── tool.py                    (97)   ToolFeatureBuilder (corpus-enriched)
 │   │   │                                     --- LAYER 5: Feature Encoding ---
-│   │   ├── pipeline.py               (247)   FeaturePipeline orchestrator
+│   │   ├── pipeline.py               (336)   FeaturePipeline orchestrator
 │   │   └── encoders/
 │   │       ├── tfidf.py               (70)   TF-IDF text encoder
 │   │       └── dense.py               (87)   E5-small dense encoder (optional)
 │   │
 │   ├── dataset/                              LAYER 4: Dataset Construction
-│   │   ├── builder.py                (200)   Pointwise (context, tool, label) pairs
-│   │   ├── negatives.py              (297)   Random / Hard / Mixed negative sampling
+│   │   ├── builder.py                (204)   Pointwise (context, tool, label) pairs
+│   │   ├── negatives.py              (298)   Random / Hard / Mixed negative sampling
 │   │   └── splitter.py               (105)   Group-aware k-fold + train/test splits
 │   │
 │   ├── head/                                 LAYER 6: Classification
-│   │   ├── classifier.py             (313)   ShortChainClassifier (XGB/RF/LR)
+│   │   ├── classifier.py             (469)   ShortChainClassifier (XGB/RF/LR)
 │   │   ├── trainer.py                (163)   CV training + final model
 │   │   └── inference.py              (142)   InferenceEngine (production API)
 │   │
@@ -75,9 +72,9 @@ ShortChain/                          (3,508 lines Python)
 │       └── logging.py                 (71)   Rich-based structured logging
 │
 ├── scripts/
-│   ├── build_dataset.py               (95)   CLI: trajectories → dataset CSV
-│   ├── train.py                      (112)   CLI: dataset → trained model
-│   └── evaluate.py                   (103)   CLI: model + test set → metrics
+│   ├── build_dataset.py               (94)   CLI: trajectories → dataset CSV
+│   ├── train.py                      (111)   CLI: dataset → trained model
+│   └── evaluate.py                   (102)   CLI: model + test set → metrics
 │
 ├── tests/                                    100 tests, ~13s
 │   ├── test_ingest.py                        Schema + loader tests
@@ -88,7 +85,7 @@ ShortChain/                          (3,508 lines Python)
 │   └── test_negatives.py                     Sampling strategies
 │
 └── configs/
-    └── default.yaml                   (95)   Complete default configuration
+    └── default.yaml                   (87)   Complete default configuration
 ```
 
 ---
@@ -379,31 +376,11 @@ All ranking metrics are **macro-averaged** across tasks (each task weighted equa
 
 ---
 
-### Adapter Layer — Benchmarks (`shortchain/benchmarks/`)
-
-**Purpose:** Decouple benchmark-specific concerns (data format, catalog loading, failure negatives) from the core pipeline.
-
-#### [adapter.py](file:///Users/awabmelayem/Downloads/ShortChain/shortchain/benchmarks/adapter.py) — BenchmarkAdapter Protocol
-
-```python
-@runtime_checkable
-class BenchmarkAdapter(Protocol):
-    name: str
-    def load_catalog(self) -> dict[str, str]: ...
-    def load_trajectories(self, split: str) -> list[Trajectory]: ...
-    def category_map(self) -> dict[str, str]: ...
-    def augment_training(self, df: pd.DataFrame) -> pd.DataFrame: ...  # default: noop
-```
-
-Every benchmark implements this. The core pipeline never sees benchmark-specific types.
-
----
-
 ### Configuration (`shortchain/config.py`)
 
-**11 Pydantic models** organized hierarchically under `ShortChainConfig`:
+**9 Pydantic models** organized hierarchically under `ShortChainConfig`:
 
-```
+```text
 ShortChainConfig
 ├── IngestConfig          # format, success_only, field_map
 │   └── FieldMapConfig    # task_id → "task_id", intent → "intent", ...
@@ -416,8 +393,7 @@ ShortChainConfig
 │   ├── RandomForestParams
 │   └── LogisticParams
 ├── InferenceConfig       # top_k, confidence_threshold
-├── EvaluationConfig      # k_values, metrics list
-└── BenchmarkConfig       # adapter name, step_level, failure negatives
+└── EvaluationConfig      # k_values, metrics list
 ```
 
 `load_config()` deep-merges a user YAML on top of `configs/default.yaml`, so you only need to specify overrides:
@@ -428,8 +404,6 @@ classifier:
   model_type: "random_forest"
 negatives:
   strategy: "hard"
-benchmark:
-  step_level: true
 ```
 
 ---
@@ -456,7 +430,7 @@ These scripts are **modular** — you can run each stage independently.
 | `test_classifier.py` | 14 | ShortChainClassifier fit/predict, binary mode, shortlist, save/load |
 | `test_metrics.py` | 8 | R-precision, Recall@k edge cases, compute_metrics integration |
 | `test_negatives.py` | 14 | Random/Hard/Mixed sampling, determinism, no-overlap guarantees |
-| **Total** | **86** | **~13 seconds** |
+| **Total** | **100** | **~13 seconds** |
 
 ---
 
