@@ -71,6 +71,7 @@ class NegativeSamplingConfig(BaseModel):
 class DatasetConfig(BaseModel):
     """Dataset construction settings."""
 
+    mode: str = "intent"  # "intent" | "span"
     negative_ratio: int = 3
     # --- Kept for backward compatibility; prefer FeaturesConfig/NegativeSamplingConfig ---
     negative_strategy: str = "random"
