@@ -64,10 +64,10 @@ class ContextFeatureBuilder:
         features["app_name"] = traj.app_name
 
         if span_index is None:
-            # Trajectory-level: summarise the whole run
-            features["n_spans"] = traj.n_spans
-            features["previous_tools"] = " | ".join(traj.tool_sequence)
-            features["last_thought"] = traj.last_thought or ""
+            # Trajectory-level (prior to execution): no previous tools have executed yet
+            features["n_spans"] = 0
+            features["previous_tools"] = ""
+            features["last_thought"] = ""
         else:
             # Span-level: summarise up to span_index
             spans_so_far = traj.spans[: span_index + 1]
@@ -95,18 +95,12 @@ class ContextFeatureBuilder:
         features: dict[str, Any] = {}
 
         if span_index is None:
-            # Trajectory-level state
-            features["span_index"] = traj.n_spans  # final position
-            seq = traj.tool_sequence
-            features["last_action"] = seq[-1] if seq else ""
-            # Last observation from final span
-            last_span = traj.spans[-1] if traj.spans else None
-            features["last_observation"] = (
-                (last_span.observation or "")[:200] if last_span else ""
-            )
-            features["unique_tools_so_far"] = len(traj.tools_used)
-            # History summary: compact representation
-            features["history_summary"] = self._summarise_history(traj.spans)
+            # Trajectory-level state (prior to execution): no steps taken yet
+            features["span_index"] = 0
+            features["last_action"] = ""
+            features["last_observation"] = ""
+            features["unique_tools_so_far"] = 0
+            features["history_summary"] = ""
         else:
             spans_so_far = traj.spans[: span_index + 1]
             features["span_index"] = span_index
