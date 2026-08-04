@@ -8,6 +8,7 @@ import pandas as pd
 from shortchain.config import DatasetConfig
 from shortchain.dataset.builder import DatasetBuilder, build_dataset
 from shortchain.dataset.splitter import GroupStratifiedSplitter
+from shortchain.features.stats import CorpusStats
 from shortchain.ingest.schema import Span, Trajectory
 
 
@@ -144,6 +145,44 @@ class TestDatasetBuilder:
                     f"Leakage: tool '{row['tool_name']}' found in "
                     f"previous_tools for negative sample (task={row['task_id']})"
                 )
+
+    def test_build_reuses_frozen_corpus_stats(self, sample_trajectories):
+        """Corpus stats must be frozen on the first build (the training set).
+
+        Reusing the same builder on an evaluation set must NOT recompute
+        tool_frequency / co-occurrence / app-counts from that set — that would
+        leak the evaluation answers into the scored features.
+        """
+        builder = DatasetBuilder()
+        train_df = builder.build(sample_trajectories)
+        assert "brand_new_tool" not in set(train_df["tool_name"])
+        assert builder.corpus_stats is not None
+
+        eval_like = Trajectory(
+            task_id="eval_1",
+            intent="Use the brand new tool",
+            app_name="newapp",
+            spans=[Span(action="brand_new_tool", thoughts="")],
+        )
+        eval_df = builder.build([eval_like])
+
+        row = eval_df[eval_df["tool_name"] == "brand_new_tool"].iloc[0]
+        # Frequency must reflect the TRAIN corpus (0), not the evaluation set (1).
+        assert row["tool_frequency"] == 0, (
+            "Corpus stats were recomputed from evaluation data (leak)."
+        )
+        # The frozen stats object is still the train-derived one.
+        assert builder.corpus_stats.get_tool_freq("send_email") == 1
+
+    def test_corpus_stats_injectable(self, sample_trajectories):
+        """An explicitly injected CorpusStats object is used and never recomputed."""
+        injected = CorpusStats(tool_frequency={"send_email": 7})
+        builder = DatasetBuilder(corpus_stats=injected)
+        df = builder.build(sample_trajectories)
+
+        assert builder.corpus_stats is injected
+        row = df[df["tool_name"] == "send_email"].iloc[0]
+        assert row["tool_frequency"] == 7
 
 
 # ---------------------------------------------------------------------------

@@ -13,11 +13,9 @@ Phase 2 upgrades:
 
 from __future__ import annotations
 
-import random
 from collections import Counter
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 from shortchain.config import (
@@ -50,6 +48,12 @@ class DatasetBuilder:
         Optional explicit tool catalog ``{tool_name: description}``.
         If ``None``, the catalog is derived from all tools seen in the
         provided trajectories.
+    corpus_stats
+        Optional precomputed ``CorpusStats`` (frozen training statistics).
+        If provided, ``build()`` uses these and never recomputes statistics
+        from the incoming trajectories, which prevents evaluation features
+        (``tool_frequency`` / co-occurrence / ``app_tool_count``) from
+        leaking test-set answers.
     """
 
     def __init__(
@@ -58,12 +62,13 @@ class DatasetBuilder:
         features_config: FeaturesConfig | None = None,
         negatives_config: NegativeSamplingConfig | None = None,
         tool_catalog: dict[str, str] | None = None,
+        corpus_stats: CorpusStats | None = None,
     ) -> None:
         self.config = config or DatasetConfig()
         self.features_config = features_config or FeaturesConfig()
         self.negatives_config = negatives_config or NegativeSamplingConfig()
         self._explicit_catalog = tool_catalog
-        self._corpus_stats: CorpusStats | None = None
+        self._corpus_stats: CorpusStats | None = corpus_stats
 
     # ------------------------------------------------------------------
     # Public API
@@ -80,8 +85,13 @@ class DatasetBuilder:
         catalog = self._resolve_catalog(trajectories)
         log.info(f"Tool catalog size: [bold]{len(catalog)}[/bold]")
 
-        # Compute corpus stats for feature builders and samplers
-        self._corpus_stats = CorpusStats.from_trajectories(trajectories)
+        # Compute corpus statistics ONCE (from the trajectories of the first
+        # build, i.e. the training set) and reuse them on every subsequent
+        # call. Never recompute from a different set (e.g. an evaluation set):
+        # test-derived tool_frequency / co-occurrence / app_tool_count would
+        # leak the answers into the scored features and inflate metrics.
+        if self._corpus_stats is None:
+            self._corpus_stats = CorpusStats.from_trajectories(trajectories)
 
         # Initialise feature builders
         context_builder = ContextFeatureBuilder(
