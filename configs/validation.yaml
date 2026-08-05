@@ -1,0 +1,55 @@
+# ShortChain P0 Validation — AppWorld (HALO Gemini traces)
+# ========================================================
+# Protocol: task-level 5-fold, frozen train corpus stats, faithful candidate
+# pools (catalog-wide + app-scoped), baselines (random, popularity, BM25),
+# macro metrics with paired-bootstrap 95% CI.
+
+data:
+  traces_path: "data/traces.jsonl"
+  success_only: false          # label G(t) = tools used (all traces by default)
+
+split:
+  n_folds: 5
+
+eval:
+  pools:
+    catalog_wide: true         # candidate pool = full catalog (91 tools)
+    app_scoped: true           # candidate pool = tools of the task's app(s)
+  k_values: [1, 3, 5, 7, 9]
+
+metrics:
+  headline: ["r_precision", "recall_at_1", "recall_at_3", "recall_at_7", "recall_at_9", "mrr", "ndcg_at_5"]
+
+baselines:
+  enabled: ["random", "popularity", "bm25"]
+
+negatives:
+  strategy: "hard"
+  hard_negative_ratio: 0.6
+  same_app_weight: 0.8
+  co_usage_weight: 0.15
+  similarity_weight: 0.05
+
+dataset:
+  negative_ratio: 3
+
+classifier:
+  model_type: "xgboost"
+  xgboost:
+    n_estimators: 300
+    max_depth: 6
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_weight: 3
+    eval_metric: "logloss"
+    early_stopping_rounds: 20
+
+seeds: 5
+
+bootstrap:
+  n_boot: 2000
+  seed: 42
+  ci: 0.95
+
+output_dir: "models/validation/p0"

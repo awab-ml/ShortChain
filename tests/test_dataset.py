@@ -184,6 +184,45 @@ class TestDatasetBuilder:
         row = df[df["tool_name"] == "send_email"].iloc[0]
         assert row["tool_frequency"] == 7
 
+    def test_build_candidates_requires_frozen_stats(self, sample_trajectories):
+        builder = DatasetBuilder()
+        with pytest.raises(ValueError, match="frozen corpus"):
+            builder.build_candidates(
+                sample_trajectories[0],
+                [{"tool_name": "x", "tool_description": ""}],
+            )
+
+    def test_build_candidates_labels_explicit_pool(self, sample_trajectories):
+        builder = DatasetBuilder()
+        train_df = builder.build(sample_trajectories)
+
+        eval_builder = DatasetBuilder(corpus_stats=builder.corpus_stats)
+        traj = Trajectory(
+            task_id="eval_9",
+            intent="Rank these tools",
+            app_name="spotify",
+            spans=[],
+            success=True,
+        )
+        rows = eval_builder.build_candidates(
+            traj,
+            [
+                {"tool_name": "send_email", "tool_description": "send"},
+                {"tool_name": "search_tracks", "tool_description": "find music"},
+                {"tool_name": "brand_new_tool", "tool_description": "new"},
+            ],
+            relevant_tools={"search_tracks", "brand_new_tool"},
+        )
+        assert len(rows) == 3
+        by_tool = {r["tool_name"]: r for r in rows}
+        assert by_tool["search_tracks"]["label"] == 1
+        assert by_tool["brand_new_tool"]["label"] == 1
+        assert by_tool["send_email"]["label"] == 0
+        # Unseen tool must not receive train-derived frequency (no leak).
+        assert by_tool["brand_new_tool"]["tool_frequency"] == 0
+        # Schema columns match the training DataFrame.
+        assert set(rows[0].keys()) >= set(train_df.columns)
+
 
 # ---------------------------------------------------------------------------
 # GroupStratifiedSplitter tests

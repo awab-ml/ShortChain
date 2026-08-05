@@ -8,7 +8,6 @@ Implements the head-matched metrics from the ShortChain methodology:
 
 from __future__ import annotations
 
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -120,6 +119,137 @@ def recall_at_k(
         recalls.append(hits / r)
 
     return float(np.mean(recalls)) if recalls else 0.0
+
+
+def ndcg_at_k(
+    y_true: np.ndarray,
+    y_scores: np.ndarray,
+    task_ids: np.ndarray,
+    k: int,
+) -> float:
+    """Compute macro-averaged nDCG@k for binary relevance.
+
+    Only the relevant-set size R is used for the ideal DCG (each relevant
+    item contributes 1/log2(rank+1)); tasks with R == 0 are skipped.
+    """
+    unique_tasks = np.unique(task_ids)
+    scores = []
+
+    for tid in unique_tasks:
+        mask = task_ids == tid
+        true = y_true[mask]
+        pred = y_scores[mask]
+        r = int(true.sum())
+        if r == 0:
+            continue
+
+        top_k_idx = np.argsort(pred)[::-1][:k]
+        dcg = 0.0
+        for pos, idx in enumerate(top_k_idx):
+            if true[idx]:
+                dcg += 1.0 / np.log2(pos + 2)
+        # Ideal: relevant items at ranks 1..min(R, k)
+        idcg = sum(1.0 / np.log2(pos + 2) for pos in range(min(r, k)))
+        scores.append(dcg / idcg if idcg > 0 else 0.0)
+
+    return float(np.mean(scores)) if scores else 0.0
+
+
+def mrr(y_true: np.ndarray, y_scores: np.ndarray, task_ids: np.ndarray) -> float:
+    """Compute macro-averaged Mean Reciprocal Rank (binary relevance).
+
+    For each task, 1 / rank of the first relevant tool; 0 if none retrieved.
+    """
+    unique_tasks = np.unique(task_ids)
+    reciprocal = []
+
+    for tid in unique_tasks:
+        mask = task_ids == tid
+        true = y_true[mask]
+        pred = y_scores[mask]
+        if int(true.sum()) == 0:
+            continue
+
+        order = np.argsort(pred)[::-1]
+        rr = 0.0
+        for rank, idx in enumerate(order, start=1):
+            if true[idx]:
+                rr = 1.0 / rank
+                break
+        reciprocal.append(rr)
+
+    return float(np.mean(reciprocal)) if reciprocal else 0.0
+
+
+def task_level_scores(
+    y_true: np.ndarray,
+    y_scores: np.ndarray,
+    task_ids: np.ndarray,
+    tool_names: np.ndarray | None = None,
+    k_values: list[int] | None = None,
+) -> dict[str, dict[str, float]]:
+    """Return per-task metric values for downstream (paired) bootstrap analysis.
+
+    Parameters
+    ----------
+    y_true
+        Binary labels (1 = relevant).
+    y_scores
+        Predicted scores.
+    task_ids
+        Task ID per sample.
+    tool_names
+        Unused; kept for API symmetry with ranking metrics.
+    k_values
+        List of k to evaluate for Recall@k / nDCG@k.
+
+    Returns
+    -------
+    dict[str, dict[str, float]]
+        ``{task_id: {"r_precision": float, "recall_at_<k>": float, ...}}``.
+    """
+    k_values = k_values or [1, 3, 5, 7, 9]
+    scores: dict[str, dict[str, float]] = {}
+
+    unique_tasks = np.unique(task_ids)
+    for tid in unique_tasks:
+        mask = task_ids == tid
+        true = y_true[mask]
+        pred = y_scores[mask]
+        r = int(true.sum())
+        if r == 0:
+            continue
+
+        entry: dict[str, float] = {}
+        order = np.argsort(pred)[::-1]
+
+        # R-precision = precision at cutoff R
+        top_r = order[:r]
+        entry["r_precision"] = float(true[top_r].sum() / r)
+
+        # MRR
+        rr = 0.0
+        for rank, idx in enumerate(order, start=1):
+            if true[idx]:
+                rr = 1.0 / rank
+                break
+        entry["mrr"] = float(rr)
+
+        for k in k_values:
+            top_k = order[:k]
+            entry[f"recall_at_{k}"] = float(true[top_k].sum() / r)
+            dcg = sum(
+                1.0 / np.log2(pos + 2)
+                for pos, idx in enumerate(order[:k])
+                if true[idx]
+            )
+            idcg = sum(
+                1.0 / np.log2(pos + 2) for pos in range(min(r, k))
+            )
+            entry[f"ndcg_at_{k}"] = float(dcg / idcg) if idcg > 0 else 0.0
+
+        scores[str(tid)] = entry
+    return scores
 
 
 def compute_metrics(
