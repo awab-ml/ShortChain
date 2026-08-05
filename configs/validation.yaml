@@ -4,6 +4,8 @@
 # pools (catalog-wide + app-scoped), baselines (random, popularity, BM25),
 # macro metrics with paired-bootstrap 95% CI.
 
+level: task   # task | span (span = per-decision, state-aware P1)
+
 data:
   traces_path: "data/traces.jsonl"
   success_only: false          # label G(t) = tools used (all traces by default)

@@ -246,6 +246,141 @@ def _run_seed(
     return task_scores, unseen_flags, app_of_task, fold_idx
 
 
+def _repeat_prev_scores(candidates: list[dict], last_action: str) -> list[float]:
+    """Naive 'repeat the previous tool' baseline scores over candidates."""
+    return [1.0 if c["tool_name"] == last_action else 0.0 for c in candidates]
+
+
+def _run_span_seed(
+    seed: int,
+    negatives_cfg,
+    dataset_cfg,
+    classifier_cfg,
+    features_cfg,
+    tasks,
+    catalog,
+    app_index,
+    pools_on,
+    baselines_on,
+    k_values,
+    n_folds,
+):
+    """Span-level (per-decision, state-aware) CV + scoring for one seed.
+
+    Trains two models per fold: ``model_state`` (context includes state before
+    the decision; ``span_index=k``) and ``model_nostate`` (context is
+    trajectory-level, ``span_index=None``) as the paper-style ablation.
+    Evaluates every decision of the test tasks at its true state, plus
+    baselines (random / popularity / BM25 / repeat_prev) on identical rows.
+    """
+    negatives_cfg.random_state = seed
+    groups = [t.task_id for t in tasks]
+    gkf = GroupKFold(n_splits=n_folds)
+
+    task_scores = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
+    unseen_flags = defaultdict(lambda: defaultdict(dict))
+    rng = np.random.default_rng(2024 + seed)
+    bm25 = build_bm25_scorer(catalog) if "bm25" in baselines_on else None
+
+    feats_off = FeaturesConfig(
+        include_state_features=False, include_dependency_features=False
+    )
+
+    fold_idx = 0
+    for train_idx, test_idx in gkf.split(tasks, groups=groups):
+        fold_idx += 1
+        train_trajs = [tasks[i] for i in train_idx]
+        test_trajs = [tasks[i] for i in test_idx]
+        log.info(
+            f"  [seed={seed}] span-fold {fold_idx}/{n_folds}: "
+            f"train={len(train_trajs)} test={len(test_trajs)}"
+        )
+
+        # State-aware training model (corpus stats frozen here).
+        b_state = DatasetBuilder(
+            config=dataset_cfg, features_config=features_cfg,
+            negatives_config=negatives_cfg, tool_catalog=catalog or None,
+        )
+        state_df = b_state.build_span_dataset(train_trajs, with_state=True)
+        train_freq = b_state.corpus_stats.tool_frequency
+        clf_state = ShortChainClassifier(classifier_cfg, features_config=features_cfg)
+        clf_state.fit(state_df.drop(columns=["label"]), state_df["label"])
+
+        # No-state ablated model: same decisions/labels, trajectory-level ctx.
+        b_nostate = DatasetBuilder(
+            config=dataset_cfg, features_config=feats_off,
+            negatives_config=negatives_cfg, tool_catalog=catalog or None,
+            corpus_stats=b_state.corpus_stats,
+        )
+        nostate_df = b_nostate.build_span_dataset(train_trajs, with_state=False)
+        clf_nostate = ShortChainClassifier(classifier_cfg, features_config=feats_off)
+        clf_nostate.fit(nostate_df.drop(columns=["label"]), nostate_df["label"])
+
+        e_state = DatasetBuilder(
+            config=dataset_cfg, features_config=features_cfg,
+            negatives_config=negatives_cfg, tool_catalog=catalog or None,
+            corpus_stats=b_state.corpus_stats,
+        )
+        e_nostate = DatasetBuilder(
+            config=dataset_cfg, features_config=feats_off,
+            negatives_config=negatives_cfg, tool_catalog=catalog or None,
+            corpus_stats=b_state.corpus_stats,
+        )
+
+        for traj in test_trajs:
+            for k, span in enumerate(traj.spans):
+                action = span.tool_name
+                if not action:
+                    continue
+                last_action = traj.spans[k - 1].tool_name if k > 0 else ""
+                dec_id = f"{traj.task_id}:{k}"
+                for pool_name in pools_on:
+                    candidates = build_candidates_for_task(traj, pool_name, catalog, app_index)
+                    rows = e_state.build_candidates(
+                        traj, candidates, relevant_tools={action}, span_index=k
+                    )
+                    if not rows:
+                        continue
+                    df = pd.DataFrame(rows)
+                    y = df["label"].values
+                    tids = df["task_id"].values
+                    tools = df["tool_name"].values
+
+                    probas = {
+                        "model_state": clf_state.predict_proba(df.drop(columns=["label"])),
+                        "random": rng.random(len(df)),
+                        "popularity": np.array([train_freq.get(t, 0) for t in tools], dtype=float),
+                        "repeat_prev": np.array(_repeat_prev_scores(candidates, last_action)),
+                    }
+                    if bm25 is not None:
+                        probas["bm25"] = np.array(
+                            bm25_score_task(bm25[0], bm25[1], bm25[2], traj.intent, candidates)
+                        )
+                    unseen = int(action not in train_freq)
+                    unseen_flags[pool_name][dec_id] = unseen
+
+                    for method, proba in probas.items():
+                        scores = task_level_scores(y, proba, tids, k_values=k_values)
+                        for tid, metric_map in scores.items():
+                            for metric, value in metric_map.items():
+                                task_scores[pool_name][method][metric][dec_id] = value
+
+                    # Ablation model evaluated at its own (state-free) context.
+                    rows_n = e_nostate.build_candidates(
+                        traj, candidates, relevant_tools={action}, span_index=None
+                    )
+                    if not rows_n:
+                        continue
+                    df_n = pd.DataFrame(rows_n)
+                    pn = clf_nostate.predict_proba(df_n.drop(columns=["label"]))
+                    scores_n = task_level_scores(y, pn, df_n["task_id"].values, k_values=k_values)
+                    for tid, metric_map in scores_n.items():
+                        for metric, value in metric_map.items():
+                            task_scores[pool_name]["model_nostate"][metric][dec_id] = value
+
+    return task_scores, unseen_flags, {}, fold_idx
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -259,6 +394,7 @@ def main() -> None:
     parser.add_argument("--folds", type=int, default=None, help="Override split.n_folds.")
     parser.add_argument("--seeds", type=int, default=None, help="Override seeds (training seeds).")
     parser.add_argument("--seed", type=int, default=None, help="Override bootstrap seed.")
+    parser.add_argument("--level", type=str, default=None, help="task | span")
     args = parser.parse_args()
 
     cfg = _load_validation_config(args.config)
@@ -291,17 +427,28 @@ def main() -> None:
 
     # 2. Multi-seed grouped CV (per-seed task scores averaged, paper-style)
     n_seeds = int(args.seeds if args.seeds is not None else cfg.get("seeds", 1))
+    level = (args.level or cfg.get("level", "task")).lower()
+    if level not in ("task", "span"):
+        log.error(f"Unknown level: {level!r} (expected 'task' or 'span')")
+        sys.exit(1)
     tasks = list(traces)
     app_of_task = {t.task_id: t.app_name for t in tasks}
 
     per_seed = []
     for s in range(n_seeds):
-        ts, uf, _app, nfolds = _run_seed(
-            s, negatives_cfg, dataset_cfg, classifier_cfg, features_cfg,
-            tasks, catalog, app_index, pools_on, baselines_on, k_values, n_folds,
-        )
+        if level == "span":
+            ts, uf, _app, nfolds = _run_span_seed(
+                s, negatives_cfg, dataset_cfg, classifier_cfg, features_cfg,
+                tasks, catalog, app_index, pools_on, baselines_on, k_values, n_folds,
+            )
+        else:
+            ts, uf, _app, nfolds = _run_seed(
+                s, negatives_cfg, dataset_cfg, classifier_cfg, features_cfg,
+                tasks, catalog, app_index, pools_on, baselines_on, k_values, n_folds,
+            )
         per_seed.append((ts, uf))
     fold_idx = nfolds
+    primary = "model" if level == "task" else "model_state"
 
     # Average per-task scores across seeds (tasks identical across seeds).
     task_scores = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
@@ -320,6 +467,8 @@ def main() -> None:
     # 5. Aggregate + significance
     report: dict = {
         "protocol": "p0_appworld_halo",
+        "level": level,
+        "primary_method": primary,
         "n_tasks": len(tasks),
         "n_train_seeds": n_seeds,
         "n_effective_folds": fold_idx,
@@ -332,10 +481,9 @@ def main() -> None:
         "pools": sorted(pools_on),
     }
 
-    # All-tools-unseen-overlap occurs only when every relevant tool of a task
-    # is absent from the train corpus; report it explicitly (0 is expected with
-    # AppWorld's shared catalog and is the paper's stable-catalog regime).
-    report["strictly_unseen_tasks"] = {
+    # Unseen-overlap: at task level this is tasks whose every relevant tool is
+    # unseen; at span level it is decisions whose target tool is unseen in train.
+    report["strictly_unseen_tasks" if level == "task" else "unseen_decisions"] = {
         pool: sum(1 for _, f in unseen_flags[pool].items() if f)
         for pool in pools_on
     }
@@ -356,7 +504,8 @@ def main() -> None:
                 # per-app
                 by_app = defaultdict(dict)
                 for tid, v in scores.items():
-                    by_app[app_of_task.get(tid, "?")][tid] = v
+                    app_key = app_of_task.get(tid.split(":")[0], "?")
+                    by_app[app_key][tid] = v
                 method_block.setdefault("per_app", {})[metric] = {
                     app: bootstrap_mean_ci(s_,
                                            n_boot=min(bcfg["n_boot"], 200),
@@ -367,19 +516,19 @@ def main() -> None:
             pool_block[method] = method_block
 
         # model vs baselines significance (per metric, Holm within metric)
-        if "model" in methods:
+        if primary in methods:
             sig = {}
             for metric in headline:
-                if metric not in methods["model"]:
+                if metric not in methods[primary]:
                     continue
                 rows = []
                 for base in sorted(methods):
-                    if base == "model" or metric not in methods[base]:
+                    if base == primary or metric not in methods[base]:
                         continue
                     if metric not in methods[base]:
                         continue
                     _, lo, hi, p = paired_bootstrap_p_and_ci(
-                        methods["model"][metric], methods[base][metric],
+                        methods[primary][metric], methods[base][metric],
                         n_boot=min(bcfg["n_boot"], 500), seed=summary_seed, ci=bcfg["ci"],
                     )
                     rows.append((base, lo, hi, p))
@@ -428,8 +577,10 @@ def main() -> None:
 
 def _print_report(report: dict) -> None:
     headline = report["headline"]
+    primary = report.get("primary_method", "model")
+    level = report.get("level", "task")
     print("\n" + "=" * 74)
-    print(f"  SHORTCHAIN P0 — APPWORLD (n={report['n_tasks']} tasks, "
+    print(f"  SHORTCHAIN P0 — APPWORLD ({level}-level, n={report['n_tasks']} tasks, "
           f"catalog={report['catalog_size']})")
     print("=" * 74)
     for pool_name, pool_block in report["results"].items():
@@ -448,7 +599,7 @@ def _print_report(report: dict) -> None:
             print(f"  {method:<12}" + "  ".join(f"{c:>11}" for c in cells))
         sig = pool_block.get("model_vs_baselines", {})
         if sig:
-            print("\n  model vs baseline significance (95% CI for delta; †=sig after Holm):")
+            print(f"\n  {primary} vs baseline significance (95% CI for delta; †=sig after Holm):")
             for metric, rows in sig.items():
                 desc = []
                 for r in rows:
@@ -456,13 +607,13 @@ def _print_report(report: dict) -> None:
                     desc.append(f"{r['baseline']}{star}[{r['delta_lo']:+.3f},{r['delta_hi']:+.3f}]")
                 print(f"    {metric:<12} " + "  ".join(desc))
         us = pool_block.get("strictly_unseen")
-        if us and "model" in us:
-            print("\n  strictly-unseen subset (all relevant tools unseen in train):")
+        if us and primary in us:
+            print(f"\n  {'strictly-unseen subset (all relevant tools unseen)' if level=='task' else 'unseen-target decisions'}:")
             cells = []
             for m in headline:
-                mean = us["model"].get(m, {}).get("mean")
+                mean = us[primary].get(m, {}).get("mean")
                 cells.append(f"{mean:.3f}" if mean is not None else "   -  ")
-            print("    model  " + "  ".join(f"{c:>11}" for c in cells) + f"  (n={us['model'].get(list(us['model'])[0], {}).get('n', '?')})")
+            print("    " + primary + "  " + "  ".join(f"{c:>11}" for c in cells) + f"  (n={us[primary].get(list(us[primary])[0], {}).get('n', '?')})")
     print("\nNote: lo>0 and † means the model is significantly BETTER than baseline (Holm).")
     print("=" * 74 + "\n")
 
