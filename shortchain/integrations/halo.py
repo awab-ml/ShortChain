@@ -193,26 +193,58 @@ def build_trajectory_from_rows(rows: list[dict]) -> Trajectory | None:
             obs = str(a.get("output.value") or "")
             slices.append((name, args, obs))
 
-    # Exclude control tools; dedupe preserving first-seen order.
-    seen: set[str] = set()
+    # Build the ordered per-decision span sequence (duplicates preserved) from
+    # the message-stream tool calls, excluding agent-control (supervisor) tools.
+    # Each decision carries its observation (the tool result embedded in the
+    # message stream) and its 0-based step index within the real task.
+    decisions = [
+        (name, obs)
+        for (name, _args, obs) in slices
+        if name and not is_control_tool(name)
+    ]
+    if not decisions:
+        return None
+
+    # If the message stream lacks a tool result for some call, fill it from the
+    # exported TOOL spans by (deterministic) first-unconsumed name match.
+    exports = []
+    for r in rows:
+        a = _as_dict(r.get("attributes"))
+        if a.get("openinference.span.kind") == "TOOL":
+            nm = a.get("tool.name")
+            if nm and not is_control_tool(nm):
+                exports.append((nm, str(a.get("output.value") or "")))
+    consumed: set[int] = set()
     spans: list[Span] = []
-    for name, _args, obs in slices:
-        if is_control_tool(name) or name in seen:
-            continue
-        seen.add(name)
+    for k, (name, obs) in enumerate(decisions):
+        if not obs:
+            for ei, (en, eobs) in enumerate(exports):
+                if ei in consumed or en != name:
+                    continue
+                consumed.add(ei)
+                obs = eobs
+                break
         spans.append(
             Span(
                 action=name,
                 thoughts="",
                 observation=obs[:2000],
                 agent_name="gemini-3-flash",
+                metadata={"step_index": k},
             )
         )
 
-    if not spans:
-        return None
-
-    apps = Counter(app_of(s.action) for s in spans)
+    # app_name/apps are derived from the UNIQUE non-control action set in
+    # first-seen order (matching the pre-refactor dedupe semantics exactly, so
+    # the duplicate-preserving span list does not perturb task-level context or
+    # introduce hash-seed-dependent tie-breaking).
+    unique_order: list[str] = []
+    seen_unique: set[str] = set()
+    for name, _obs in decisions:
+        if name not in seen_unique:
+            seen_unique.add(name)
+            unique_order.append(name)
+    apps = Counter(app_of(a) for a in unique_order)
     app_name = apps.most_common(1)[0][0] if apps else ""
 
     # Soft success proxy: the exported TOOL span stream ends with complete_task.
@@ -234,8 +266,8 @@ def build_trajectory_from_rows(rows: list[dict]) -> Trajectory | None:
             "source": source,
             "real_task_found": real_task_found,
             "apps": sorted(apps),
-            "n_calls_total": len(slices),
-            "n_unique_tools": len(spans),
+            "n_calls_total": len(decisions),
+            "n_unique_tools": len({s.action for s in spans}),
         },
     )
 
