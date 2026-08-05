@@ -257,3 +257,88 @@ class TestGroupStratifiedSplitter:
             train_tasks = set(train_fold["task_id"].unique())
             val_tasks = set(val_fold["task_id"].unique())
             assert train_tasks.isdisjoint(val_tasks)
+
+
+class TestSpanLevelNoLookahead:
+    """State-aware (per-decision) context must NEVER see the current or future
+    step — this is the P1 anti-leakage contract."""
+
+    @pytest.fixture
+    def stateful_traj(self) -> Trajectory:
+        return Trajectory(
+            task_id="s1",
+            intent="do a multi step thing",
+            app_name="spotify",
+            spans=[
+                Span(action="login", thoughts="", observation="obs_login"),
+                Span(action="show_library", thoughts="", observation="SECRET_LIBRARY_RESULT"),
+                Span(action="show_song", thoughts="", observation="SECRET_SONG_RESULT"),
+            ],
+        )
+
+    def test_context_at_k_uses_only_prior_steps(self, stateful_traj, tool_catalog):
+        builder = DatasetBuilder(tool_catalog=tool_catalog)
+        builder.build([stateful_traj])  # freeze train stats
+        eval_builder = DatasetBuilder(tool_catalog=tool_catalog, corpus_stats=builder.corpus_stats)
+
+        rows = eval_builder.build_candidates(
+            stateful_traj,
+            [{"tool_name": "show_song", "tool_description": ""}],
+            relevant_tools={"show_song"},
+            span_index=2,
+        )
+        row = rows[0]
+        # At decision 2 (call show_song): context must reflect ONLY steps 0..1.
+        assert row["previous_tools"] == "login | show_library"
+        assert "show_song" not in row["previous_tools"]
+        assert row["last_action"] == "show_library"
+        assert "SECRET_LIBRARY_RESULT" in row["last_observation"]
+        assert "SECRET_SONG_RESULT" not in row["last_observation"]
+        assert row["span_index"] == 2
+
+    def test_no_lookahead_truncation_invariance(self, stateful_traj, tool_catalog):
+        """Context at k must be identical whether or not later steps exist."""
+        builder = DatasetBuilder(tool_catalog=tool_catalog)
+        builder.build([stateful_traj])
+        eval_builder = DatasetBuilder(tool_catalog=tool_catalog, corpus_stats=builder.corpus_stats)
+
+        full = eval_builder.build_candidates(
+            stateful_traj,
+            [{"tool_name": "show_song", "tool_description": ""}],
+            relevant_tools={"show_song"},
+            span_index=2,
+        )[0]
+        truncated = Trajectory(
+            task_id=stateful_traj.task_id,
+            intent=stateful_traj.intent,
+            app_name=stateful_traj.app_name,
+            spans=stateful_traj.spans[:2],  # drop everything at/after k
+        )
+        cut = eval_builder.build_candidates(
+            truncated,
+            [{"tool_name": "show_song", "tool_description": ""}],
+            relevant_tools={"show_song"},
+            span_index=2,
+        )[0]
+        for k in full:
+            if k not in ("task_id",):
+                assert full[k] == cut[k], f"lookahead leak in feature {k!r}"
+
+    def test_span_negatives_exclude_used_and_target(self, stateful_traj, tool_catalog):
+        builder = DatasetBuilder(tool_catalog=tool_catalog)
+        df = builder.build_span_dataset([stateful_traj])
+        # For the decision where show_song is the positive, previous_tools is
+        # "login | show_library" and negatives must exclude all of {login,
+        # show_library, show_song}.
+        pos = df[(df["label"] == 1) & (df["tool_name"] == "show_song")].iloc[0]
+        assert pos["previous_tools"] == "login | show_library"
+        neg = df[(df["label"] == 0) & (df["previous_tools"] == "login | show_library")]
+        assert "show_song" not in set(neg["tool_name"])
+        assert not set(neg["tool_name"]).intersection({"login", "show_library"})
+
+    def test_build_span_dataset_schema_matches_training(self, stateful_traj, tool_catalog):
+        b1 = DatasetBuilder(tool_catalog=tool_catalog)
+        traindf = b1.build([stateful_traj])
+        b2 = DatasetBuilder(tool_catalog=tool_catalog, corpus_stats=b1.corpus_stats)
+        span = b2.build_span_dataset([stateful_traj])
+        assert set(traindf.columns) == set(span.columns)

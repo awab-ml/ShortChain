@@ -151,6 +151,7 @@ class DatasetBuilder:
         traj: Trajectory,
         candidates: list[dict[str, Any]],
         relevant_tools: set[str] | None = None,
+        span_index: int | None = None,
     ) -> list[dict[str, Any]]:
         """Build pointwise (context, tool, label) rows for one trajectory against an
         explicit candidate set.
@@ -170,6 +171,12 @@ class DatasetBuilder:
         relevant_tools
             Set of candidate ``tool_name`` values that are ground-truth relevant
             (label = 1); everything else is label = 0.
+        span_index
+            Decision point to build state context for. If ``None`` (default),
+            trajectory-level (pre-execution) context is used. If an integer
+            ``k``, the context reflects ONLY the state before step ``k``
+            (``traj.spans[:k]``) — never the current/future — so per-decision
+            evaluation cannot look ahead.
 
         Returns
         -------
@@ -181,7 +188,7 @@ class DatasetBuilder:
             raise ValueError(
                 "DatasetBuilder must have frozen corpus statistics before "
                 "build_candidates() (pass corpus_stats= derived from the TRAIN "
-                "set). Recomputing stats from evaluation data would leak test "
+                "set). Recomputing statistics from evaluation data would leak test "
                 "answers into the features."
             )
 
@@ -192,7 +199,7 @@ class DatasetBuilder:
             include_dependencies=self.features_config.include_dependency_features,
         )
         tool_builder = ToolFeatureBuilder(corpus_stats=self._corpus_stats)
-        context = context_builder.build(traj, span_index=None)
+        context = context_builder.build(traj, span_index=span_index)
 
         rows: list[dict[str, Any]] = []
         seen: set[str] = set()
@@ -212,6 +219,92 @@ class DatasetBuilder:
                 )
             )
         return rows
+
+    def build_span_dataset(
+        self,
+        trajectories: list[Trajectory],
+        with_state: bool = True,
+    ) -> pd.DataFrame:
+        """Build a per-decision (state-aware) pointwise dataset.
+
+        For every decision step ``k`` of every trajectory a positive row is
+        created for the tool actually called at ``k``. When ``with_state`` is
+        ``True`` (default) the context is built from the state before ``k``
+        (``span_index=k`` → ``traj.spans[:k]``, i.e. no lookahead). When it is
+        ``False`` the context is trajectory-level (``span_index=None``) — a
+        state-free control that isolates the contribution of state features.
+
+        Returns
+        -------
+        pd.DataFrame
+            Same schema/columns as ``build()`` (identical feature builders), so
+            the same classifier/pipeline can consume it.
+        """
+        if self._corpus_stats is None:
+            self._corpus_stats = CorpusStats.from_trajectories(trajectories)
+        catalog = self._resolve_catalog(trajectories)
+
+        context_builder = ContextFeatureBuilder(
+            corpus_stats=self._corpus_stats,
+            include_state=self.features_config.include_state_features,
+            include_dependencies=self.features_config.include_dependency_features,
+        )
+        tool_builder = ToolFeatureBuilder(corpus_stats=self._corpus_stats)
+        sampler = create_sampler(
+            config=self.negatives_config,
+            catalog=catalog,
+            corpus_stats=self._corpus_stats,
+        )
+
+        rows: list[dict[str, Any]] = []
+        for traj in trajectories:
+            used_so_far: set[str] = set()
+            for k, span in enumerate(traj.spans):
+                action = span.tool_name
+                if not action:
+                    continue
+                span_idx = k if with_state else None
+                context = context_builder.build(traj, span_index=span_idx)
+                # Negative pool = catalog minus the tools already in play (the
+                # current call + every tool used before it). Excluding used
+                # tools prevents trivially-rejectable negatives and mirrors the
+                # "pick the next tool" decision task.
+                exclude = set(used_so_far) | {action}
+                n_neg = self.config.negative_ratio
+                negatives = sampler.sample(
+                    positive_tools=exclude,
+                    app_name=traj.app_name,
+                    n=n_neg,
+                )
+                rows.append(
+                    self._make_row(
+                        context=context,
+                        tool_name=action,
+                        description=catalog.get(action, ""),
+                        label=1,
+                        tool_builder=tool_builder,
+                    )
+                )
+                for tool in negatives:
+                    rows.append(
+                        self._make_row(
+                            context=context,
+                            tool_name=tool,
+                            description=catalog.get(tool, ""),
+                            label=0,
+                            tool_builder=tool_builder,
+                        )
+                    )
+                used_so_far.add(action)
+
+        df = pd.DataFrame(rows)
+        pos = int(df["label"].sum())
+        neg = len(df) - pos
+        log.info(
+            f"Built span dataset: [bold green]{len(df)}[/bold green] rows "
+            f"({pos} positive, {neg} negative)"
+        )
+        return df
 
     # ------------------------------------------------------------------
     # Internals
