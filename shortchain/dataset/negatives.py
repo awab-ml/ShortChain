@@ -9,14 +9,11 @@ Provides pluggable strategies for selecting negative (label=0) tools:
 Use ``create_sampler()`` as the factory entry-point.
 """
 from __future__ import annotations
-from pandas import plotting
 
 
 
 import random
-from typing import Any
 
-import numpy as np
 
 from shortchain.config import NegativeSamplingConfig
 from shortchain.features.stats import CorpusStats
@@ -125,11 +122,17 @@ class HardNegativeSampler(NegativeSampler):
             for app, tools in corpus_stats.app_tools.items():
                 self._app_pools[app] = sorted(tools)
 
-        # Precompute: co-usage rankings per tool
+        # Precompute: co-usage rankings per tool.
+        # Ties are broken by tool name so results never depend on dict
+        # insertion order (which follows set iteration / PYTHONHASHSEED).
         self._co_usage_ranked: dict[str, list[str]] = {}
         if corpus_stats:
             for tool, co_occ in corpus_stats.co_occurrence.items():
-                ranked = sorted(co_occ, key=co_occ.get, reverse=True)
+                ranked = sorted(
+                    co_occ,
+                    key=lambda t: (co_occ.get(t), t),
+                    reverse=True,
+                )
                 self._co_usage_ranked[tool] = ranked
 
         # Precompute: description token sets for similarity
@@ -144,9 +147,14 @@ class HardNegativeSampler(NegativeSampler):
         app_name: str,
         n: int,
     ) -> list[str]:
-        pool = set(self.catalog) - positive_tools
-        if not pool:
+        # Work on a sorted list so results never depend on set-iteration order
+        # (i.e. the process-level PYTHONHASHSEED) — determinism is required for
+        # reproducible experiments.
+        positive = sorted(positive_tools)
+        pool_list = sorted(set(self.catalog) - set(positive))
+        if not pool_list:
             return []
+        pool_set = set(pool_list)
 
         n_same_app = max(1, int(n * self.same_app_weight))
         n_co_usage = max(1, int(n * self.co_usage_weight))
@@ -154,16 +162,16 @@ class HardNegativeSampler(NegativeSampler):
 
         selected: list[str] = []
 
-        # 1. Same-app negatives
-        same_app = [t for t in self._app_pools.get(app_name, []) if t in pool]
+        # 1. Same-app negatives (app pool is already sorted)
+        same_app = [t for t in self._app_pools.get(app_name, []) if t in pool_set]
         self._rng.shuffle(same_app)
         selected.extend(same_app[:n_same_app])
 
         # 2. Co-usage negatives (tools that co-occur with positives)
         co_usage_candidates: list[str] = []
-        for pos_tool in positive_tools:
+        for pos_tool in positive:
             for t in self._co_usage_ranked.get(pos_tool, []):
-                if t in pool and t not in selected and t not in positive_tools:
+                if t in pool_set and t not in selected and t not in positive_tools:
                     co_usage_candidates.append(t)
         # Deduplicate preserving order
         seen = set(selected)
@@ -175,10 +183,10 @@ class HardNegativeSampler(NegativeSampler):
         selected.extend(co_usage_unique[:n_co_usage])
 
         # 3. Description-similar negatives (token overlap)
-        remaining_pool = [t for t in pool if t not in set(selected)]
-        if remaining_pool and positive_tools:
+        remaining_pool = [t for t in pool_list if t not in seen]
+        if remaining_pool and positive:
             pos_tokens = set()
-            for pt in positive_tools:
+            for pt in positive:
                 pos_tokens |= self._desc_tokens.get(pt, set())
             if pos_tokens:
                 scored = []
@@ -190,7 +198,7 @@ class HardNegativeSampler(NegativeSampler):
 
         # Fill any remaining slots with random
         if len(selected) < n:
-            leftover = [t for t in pool if t not in set(selected)]
+            leftover = [t for t in pool_list if t not in set(selected)]
             self._rng.shuffle(leftover)
             selected.extend(leftover[: n - len(selected)])
 

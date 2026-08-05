@@ -249,8 +249,8 @@ class DatasetBuilder:
         context = context_builder.build(traj, span_index=None)
         rows: list[dict[str, Any]] = []
 
-        # Positive pairs: tools actually used
-        for tool_name in traj.tools_used:
+        # Positive pairs: tools actually used (sorted for deterministic row order)
+        for tool_name in sorted(traj.tools_used):
             rows.append(
                 self._make_row(
                     context=context,
