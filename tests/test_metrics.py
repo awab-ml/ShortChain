@@ -108,3 +108,34 @@ class TestFormatMetrics:
         output = format_metrics(metrics)
         assert "accuracy" in output
         assert "0.8500" in output
+
+
+# ---------------------------------------------------------------------------
+# nDCG / MRR / task-level scores tests
+# ---------------------------------------------------------------------------
+
+class TestRankingMetrics:
+    def test_ndcg_perfect(self):
+        y_true = np.array([1, 1, 0, 0, 0])
+        y_scores = np.array([0.9, 0.8, 0.3, 0.2, 0.1])
+        tids = np.array(["t1"] * 5)
+        from shortchain.evaluation.metrics import ndcg_at_k
+        # with R=2, perfect ordering -> nDCG@2 = 1
+        assert ndcg_at_k(y_true, y_scores, tids, 2) == pytest.approx(1.0)
+
+    def test_mrr(self):
+        from shortchain.evaluation.metrics import mrr
+        # t1: relevant at rank 2 -> 0.5 ; t2: relevant at rank 1 -> 1.0
+        y_true = np.array([1, 0, 0, 0, 1])
+        y_scores = np.array([0.6, 0.9, 0.1, 0.1, 0.8])
+        tids = np.array(["t1", "t1", "t1", "t2", "t2"])
+        assert mrr(y_true, y_scores, tids) == pytest.approx(0.75)
+
+    def test_task_level_scores(self):
+        from shortchain.evaluation.metrics import task_level_scores
+        y_true = np.array([1, 0, 1, 1, 0])
+        y_scores = np.array([0.9, 0.5, 0.8, 0.7, 0.1])
+        tids = np.array(["t1", "t1", "t2", "t2", "t2"])
+        out = task_level_scores(y_true, y_scores, tids, k_values=[1, 3])
+        assert set(out.keys()) == {"t1", "t2"}
+        assert set(out["t1"].keys()) >= {"r_precision", "mrr", "recall_at_1", "ndcg_at_3"}
