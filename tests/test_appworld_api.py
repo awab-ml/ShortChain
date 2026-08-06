@@ -5,11 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 
 from shortchain.integrations.appworld_api import (
     ParamSpec,
-    ToolSpec,
     build_catalog_and_schemas,
     load_appworld_api_spec,
     coverage_report,

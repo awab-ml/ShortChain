@@ -6,7 +6,6 @@ TfidfEncoder, DenseEncoder (fallback), and FeaturePipeline.
 
 from __future__ import annotations
 
-import pickle
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,7 +13,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from shortchain.config import FeaturesConfig
 from shortchain.features.context import ContextFeatureBuilder
 from shortchain.features.encoders import TfidfEncoder, DenseEncoder, create_encoder
 from shortchain.features.pipeline import FeaturePipeline
