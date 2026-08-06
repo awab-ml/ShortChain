@@ -391,3 +391,69 @@ class TestFeaturePipeline(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestToolSchemaFeatures:
+    """P2: static per-tool schema features must be emitted deterministically and
+    must NOT appear when no specs are provided (backward compatibility)."""
+
+    def _specs(self):
+        from shortchain.integrations.appworld_api import ToolSpec, ParamSpec
+        return {
+            "spotify__login": ToolSpec(
+                app_name="spotify", api_name="spotify__login",
+                description="Log in.",
+                parameters=(
+                    ParamSpec(name="username", type="string"),
+                    ParamSpec(name="scope", type="string", enum=("a", "b")),
+                ),
+            ),
+            "spotify__show_song": ToolSpec(
+                app_name="spotify", api_name="spotify__show_song",
+                description="Show song.",
+                parameters=(
+                    ParamSpec(name="song_id", type="integer"),
+                    ParamSpec(name="artists", type="array", items_type="string"),
+                    ParamSpec(name="explicit", type="boolean"),
+                ),
+            ),
+        }
+
+    def test_schema_features_emitted(self):
+        from shortchain.features.tool import ToolFeatureBuilder
+        b = ToolFeatureBuilder(tool_specs=self._specs())
+        f = b.build("spotify__show_song", {"description": "x"})
+        assert f["n_params"] == 3
+        assert f["n_integer_params"] == 1
+        assert f["n_boolean_params"] == 1
+        assert f["n_array_params"] == 1
+        assert f["n_enum_params"] == 0
+        assert f["has_parameters"] == 1
+        f_login = b.build("spotify__login", {"description": "x"})
+        assert f_login["n_enum_params"] == 1
+        f_none = b.build("no_spec_tool", {"description": "x"})
+        assert f_none["n_params"] == 0 and f_none["has_parameters"] == 0
+
+    def test_no_specs_means_no_schema_columns(self):
+        from shortchain.features.tool import ToolFeatureBuilder
+        b = ToolFeatureBuilder(tool_specs=None)
+        f = b.build("spotify__login", {"description": "x"})
+        assert "n_params" not in f
+        assert "has_parameters" not in f
+
+    def test_pipeline_encodes_schema_columns(self):
+        import pandas as pd
+        from shortchain.features.pipeline import FeaturePipeline
+        df = pd.DataFrame([
+            {"tool_name": "a", "tool_description": "d", "n_params": 2,
+             "n_string_params": 1, "n_integer_params": 0, "n_number_params": 0,
+             "n_boolean_params": 1, "n_array_params": 0, "n_enum_params": 1,
+             "has_parameters": 1, "intent": "q", "app_name": "spotify",
+             "n_spans": 0, "span_index": 0, "unique_tools_so_far": 0,
+             "tool_diversity": 0.0, "app_tool_count": 10,
+             "tool_name_length": 1, "tool_frequency": 0, "tool_co_occurrence": 0.0,
+             "previous_tools": "", "last_thought": "", "history_summary": "",
+             "last_observation": "", "task_id": "t"},
+        ])
+        X = FeaturePipeline().fit_transform(df)
+        assert X.shape[1] > 0  # schema cols parsed without error

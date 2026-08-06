@@ -22,6 +22,7 @@ import argparse
 import json
 import sys
 import time
+from typing import Any
 from collections import defaultdict
 from pathlib import Path
 
@@ -49,6 +50,7 @@ from shortchain.integrations.halo import (
     load_appworld_traces,
     reconstruct_catalog,
 )
+from shortchain.integrations.appworld_api import build_catalog_and_schemas
 from shortchain.utils.logging import get_logger
 
 log = get_logger(__name__)
@@ -82,9 +84,11 @@ def _normalize_doc(name: str) -> str:
 
 
 def build_bm25_scorer(catalog: dict[str, str]):
-    """Fit a TF-IDF lexical scorer on catalog tool documents (name only; no
-    labels involved, so it is a legitimate unsupervised baseline)."""
-    docs = {name: _normalize_doc(name) for name in catalog}
+    """Fit a TF-IDF lexical scorer on catalog tool documents (name + the
+    candidate text/description; no labels involved, so a legitimate
+    unsupervised baseline)."""
+    docs = {name: f"{_normalize_doc(name)} {_normalize_doc(desc)}"
+            for name, desc in catalog.items()}
     vec = TfidfVectorizer(lowercase=True, analyzer="word")
     all_docs = list(docs.values())
     mat = vec.fit_transform(all_docs)  # rows align with sorted(catalog)
@@ -119,7 +123,7 @@ def build_candidates_for_task(
         for app in apps:
             names.extend(app_index.get(app, []))
         names = sorted(set(names))
-    return [{"tool_name": n, "tool_description": ""} for n in names]
+    return [{"tool_name": n, "tool_description": catalog.get(n, "")} for n in names]
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +175,7 @@ def _run_seed(
     tasks,
     catalog,
     app_index,
+    tool_specs,
     pools_on,
     baselines_on,
     k_values,
@@ -207,7 +212,7 @@ def _run_seed(
             config=dataset_cfg,
             features_config=features_cfg,
             negatives_config=negatives_cfg,
-            tool_catalog=catalog or None,
+            tool_catalog=catalog or None, tool_specs=tool_specs,
         )
         train_df = train_builder.build(train_trajs)
         train_freq = train_builder.corpus_stats.tool_frequency
@@ -219,7 +224,7 @@ def _run_seed(
             config=dataset_cfg,
             features_config=features_cfg,
             negatives_config=negatives_cfg,
-            tool_catalog=catalog or None,
+            tool_catalog=catalog or None, tool_specs=tool_specs,
             corpus_stats=train_builder.corpus_stats,  # frozen train stats
         )
 
@@ -260,6 +265,7 @@ def _run_span_seed(
     tasks,
     catalog,
     app_index,
+    tool_specs,
     pools_on,
     baselines_on,
     k_values,
@@ -299,7 +305,7 @@ def _run_span_seed(
         # State-aware training model (corpus stats frozen here).
         b_state = DatasetBuilder(
             config=dataset_cfg, features_config=features_cfg,
-            negatives_config=negatives_cfg, tool_catalog=catalog or None,
+            negatives_config=negatives_cfg, tool_catalog=catalog or None, tool_specs=tool_specs,
         )
         state_df = b_state.build_span_dataset(train_trajs, with_state=True)
         train_freq = b_state.corpus_stats.tool_frequency
@@ -309,7 +315,7 @@ def _run_span_seed(
         # No-state ablated model: same decisions/labels, trajectory-level ctx.
         b_nostate = DatasetBuilder(
             config=dataset_cfg, features_config=feats_off,
-            negatives_config=negatives_cfg, tool_catalog=catalog or None,
+            negatives_config=negatives_cfg, tool_catalog=catalog or None, tool_specs=tool_specs,
             corpus_stats=b_state.corpus_stats,
         )
         nostate_df = b_nostate.build_span_dataset(train_trajs, with_state=False)
@@ -318,12 +324,12 @@ def _run_span_seed(
 
         e_state = DatasetBuilder(
             config=dataset_cfg, features_config=features_cfg,
-            negatives_config=negatives_cfg, tool_catalog=catalog or None,
+            negatives_config=negatives_cfg, tool_catalog=catalog or None, tool_specs=tool_specs,
             corpus_stats=b_state.corpus_stats,
         )
         e_nostate = DatasetBuilder(
             config=dataset_cfg, features_config=feats_off,
-            negatives_config=negatives_cfg, tool_catalog=catalog or None,
+            negatives_config=negatives_cfg, tool_catalog=catalog or None, tool_specs=tool_specs,
             corpus_stats=b_state.corpus_stats,
         )
 
@@ -415,7 +421,7 @@ def main() -> None:
 
     negatives_cfg, dataset_cfg, classifier_cfg, features_cfg = _build_model_configs(cfg)
 
-    # 1. Load traces + catalog
+    # 1. Load traces + catalog + (P2) AppWorld API spec
     t0 = time.time()
     traces = load_appworld_traces(data_cfg["traces_path"], success_only=data_cfg.get("success_only", False))
     if not traces:
@@ -423,6 +429,19 @@ def main() -> None:
         sys.exit(1)
     catalog = reconstruct_catalog(data_cfg["traces_path"])
     app_index = catalog_app_index(catalog)
+
+    fc_dir = data_cfg.get("appworld_api_dir") or ""
+    tool_specs: dict[str, Any] = {}
+    spec_coverage: dict[str, Any] = {}
+    if fc_dir and (Path(fc_dir).is_dir() or Path(fc_dir + "/spotify.json").exists()):
+        catalog, tool_specs = build_catalog_and_schemas(fc_dir, catalog)
+        spec_coverage = {
+            "tools_with_specs": len(tool_specs),
+            "tools_total": len(catalog),
+            "coverage": round(len(tool_specs) / max(1, len(catalog)), 4),
+            "missing": sorted(set(catalog) - set(tool_specs)),
+        }
+        log.info(f"AppWorld API spec: {spec_coverage['tools_with_specs']}/{spec_coverage['tools_total']} tools resolved")
     log.info(f"Loaded {len(traces)} tasks, catalog={len(catalog)} tools")
 
     # 2. Multi-seed grouped CV (per-seed task scores averaged, paper-style)
@@ -439,12 +458,12 @@ def main() -> None:
         if level == "span":
             ts, uf, _app, nfolds = _run_span_seed(
                 s, negatives_cfg, dataset_cfg, classifier_cfg, features_cfg,
-                tasks, catalog, app_index, pools_on, baselines_on, k_values, n_folds,
+                tasks, catalog, app_index, tool_specs, pools_on, baselines_on, k_values, n_folds,
             )
         else:
             ts, uf, _app, nfolds = _run_seed(
                 s, negatives_cfg, dataset_cfg, classifier_cfg, features_cfg,
-                tasks, catalog, app_index, pools_on, baselines_on, k_values, n_folds,
+                tasks, catalog, app_index, tool_specs, pools_on, baselines_on, k_values, n_folds,
             )
         per_seed.append((ts, uf))
     fold_idx = nfolds
@@ -479,6 +498,7 @@ def main() -> None:
         "headline": headline,
         "baselines": sorted(baselines_on),
         "pools": sorted(pools_on),
+        "appworld_api_spec": spec_coverage,
     }
 
     # Unseen-overlap: at task level this is tasks whose every relevant tool is
