@@ -27,7 +27,7 @@ import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 
 from shortchain.config import FeaturesConfig
-from shortchain.features.encoders import TfidfEncoder, create_encoder
+from shortchain.features.encoders import create_encoder
 from shortchain.utils.logging import get_logger
 
 log = get_logger(__name__)
@@ -57,12 +57,21 @@ _NUM_COLS = [
     "tool_name_length",
     "tool_frequency",
     "tool_co_occurrence",
+    # Static per-tool schema features (P2); absent columns are simply skipped.
+    "n_params",
+    "n_string_params",
+    "n_integer_params",
+    "n_number_params",
+    "n_boolean_params",
+    "n_array_params",
+    "n_enum_params",
 ]
 
 # Boolean flags converted to binary float representations (0.0 / 1.0)
 _BOOL_COLS = [
     "has_description",
     "tool_app_match",
+    "has_parameters",
 ]
 
 # Categorical variables encoded using integer label encoding

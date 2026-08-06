@@ -54,6 +54,10 @@ class DatasetBuilder:
         from the incoming trajectories, which prevents evaluation features
         (``tool_frequency`` / co-occurrence / ``app_tool_count``) from
         leaking test-set answers.
+    tool_specs
+        Optional mapping ``{tool_name: ToolSpec}`` (AppWorld function-calling
+        definitions) enabling static per-tool schema features
+        (argument count / type distribution). Purely catalog metadata.
     """
 
     def __init__(
@@ -63,11 +67,13 @@ class DatasetBuilder:
         negatives_config: NegativeSamplingConfig | None = None,
         tool_catalog: dict[str, str] | None = None,
         corpus_stats: CorpusStats | None = None,
+        tool_specs: dict[str, Any] | None = None,
     ) -> None:
         self.config = config or DatasetConfig()
         self.features_config = features_config or FeaturesConfig()
         self.negatives_config = negatives_config or NegativeSamplingConfig()
         self._explicit_catalog = tool_catalog
+        self._tool_specs = tool_specs
         self._corpus_stats: CorpusStats | None = corpus_stats
 
     # ------------------------------------------------------------------
@@ -99,7 +105,8 @@ class DatasetBuilder:
             include_state=self.features_config.include_state_features,
             include_dependencies=self.features_config.include_dependency_features,
         )
-        tool_builder = ToolFeatureBuilder(corpus_stats=self._corpus_stats)
+        tool_builder = ToolFeatureBuilder(corpus_stats=self._corpus_stats,
+            tool_specs=self._tool_specs)
 
         # Initialise negative sampler
         sampler = create_sampler(
@@ -198,7 +205,8 @@ class DatasetBuilder:
             include_state=self.features_config.include_state_features,
             include_dependencies=self.features_config.include_dependency_features,
         )
-        tool_builder = ToolFeatureBuilder(corpus_stats=self._corpus_stats)
+        tool_builder = ToolFeatureBuilder(corpus_stats=self._corpus_stats,
+            tool_specs=self._tool_specs)
         context = context_builder.build(traj, span_index=span_index)
 
         rows: list[dict[str, Any]] = []
@@ -249,7 +257,8 @@ class DatasetBuilder:
             include_state=self.features_config.include_state_features,
             include_dependencies=self.features_config.include_dependency_features,
         )
-        tool_builder = ToolFeatureBuilder(corpus_stats=self._corpus_stats)
+        tool_builder = ToolFeatureBuilder(corpus_stats=self._corpus_stats,
+            tool_specs=self._tool_specs)
         sampler = create_sampler(
             config=self.negatives_config,
             catalog=catalog,
