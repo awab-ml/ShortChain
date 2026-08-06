@@ -9,6 +9,7 @@ level: task   # task | span (span = per-decision, state-aware P1)
 data:
   traces_path: "data/traces.jsonl"
   success_only: false          # label G(t) = tools used (all traces by default)
+  appworld_api_dir: "data/appworld_api/function_calling"  # P2: tool descriptions + arg schemas (empty to disable)
 
 split:
   n_folds: 5
