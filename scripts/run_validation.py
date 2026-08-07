@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from typing import Any
@@ -28,6 +29,13 @@ from pathlib import Path
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+# torch (sentence-transformers) and XGBoost both dispatch OpenMP; loading E5 then
+# training XGBoost in one process can segfault on duplicate libomp. These must be
+# set before either native runtime initializes.
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 import numpy as np
 import pandas as pd
@@ -119,6 +127,53 @@ def bm25_score_task(vec, mat, name_to_row, query: str, candidates: list[dict]) -
     return scores
 
 
+def build_dsr_scorer(catalog: dict[str, str], model_name: str = "intfloat/e5-small-v2"):
+    """Build a dense (E5, sentence-transformers) retrieval scorer.
+
+    Zero-shot DSR baseline: tool documents are encoded once (no labels used),
+    queries are encoded per task, and candidates are ranked by cosine
+    similarity. Uses the E5 asymmetric ``passage:``/``query:`` prefixes.
+    """
+    from sentence_transformers import SentenceTransformer
+
+    encoder = SentenceTransformer(model_name)
+    names = sorted(catalog)
+    docs = [catalog.get(n, "") or n for n in names]
+    embs = encoder.encode(
+        [f"passage: {d}" for d in docs],
+        normalize_embeddings=True,
+        show_progress_bar=False,
+        batch_size=32,
+    )
+    mat = np.asarray(embs, dtype=np.float32)
+    name_to_row = {n: i for i, n in enumerate(names)}
+    return encoder, mat, name_to_row
+
+
+def dsr_score_task(encoder, mat, name_to_row, query: str, candidates: list[dict]) -> list[float]:
+    """Cosine similarity between the task query embedding and each tool doc."""
+    q = np.asarray(
+        encoder.encode([f"query: {query}"], normalize_embeddings=True,
+                       show_progress_bar=False)[0],
+        dtype=np.float32,
+    )
+    scores = []
+    for cand in candidates:
+        row = name_to_row.get(cand["tool_name"])
+        if row is None:
+            scores.append(0.0)
+        else:
+            scores.append(float(np.dot(q, mat[row])))
+    return scores
+
+
+def _timed(fn, *args, **kwargs) -> tuple[Any, float]:
+    """Run ``fn`` and return ``(result, elapsed_ms)``."""
+    t0 = time.perf_counter()
+    result = fn(*args, **kwargs)
+    return result, (time.perf_counter() - t0) * 1000.0
+
+
 def build_candidates_for_task(
     traj, pool_name: str, catalog: dict[str, str], app_index: dict[str, list[str]]
 ) -> list[dict]:
@@ -165,12 +220,19 @@ def _score_methods(
     relevant = traj.tools_used & ordered
     strictly_unseen = bool(relevant) and not (relevant & set(train_freq))
 
+    model_p, lat_model = _timed(clf.predict_proba, df.drop(columns=["label"]))
+    random_p, lat_random = _timed(rng.random, len(df))
+    pop_p, lat_pop = _timed(
+        lambda: np.array([train_freq.get(t, 0) for t in tool_names], dtype=float)
+    )
+
     out = {
-        "model": clf.predict_proba(df.drop(columns=["label"])),
-        "random": rng.random(len(df)),
-        "popularity": np.array([train_freq.get(t, 0) for t in tool_names], dtype=float),
+        "model": model_p,
+        "random": random_p,
+        "popularity": pop_p,
     }
-    return y_true, task_ids, tool_names, out, int(strictly_unseen)
+    latency = {"model": lat_model, "random": lat_random, "popularity": lat_pop}
+    return y_true, task_ids, tool_names, out, int(strictly_unseen), latency
 
 
 def _run_seed(
@@ -187,6 +249,7 @@ def _run_seed(
     baselines_on,
     k_values,
     n_folds,
+    dsr_model: str = "intfloat/e5-small-v2",
 ):
     """Run the grouped CV + scoring for one training seed.
 
@@ -202,11 +265,16 @@ def _run_seed(
     task_scores = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
     unseen_flags = defaultdict(lambda: defaultdict(dict))
     app_of_task: dict[str, str] = {}
+    latency_sum: dict[str, float] = {}
+    latency_n: dict[str, int] = {}
     rng = np.random.default_rng(2024 + seed)
 
     bm25 = None
     if "bm25" in baselines_on:
         bm25 = build_bm25_scorer(catalog)
+    dsr = None
+    if "dsr_e5" in baselines_on:
+        dsr = build_dsr_scorer(catalog, dsr_model)
 
     fold_idx = 0
     for train_idx, test_idx in group_kfold.split(tasks, groups=groups):
@@ -242,20 +310,29 @@ def _run_seed(
                 res = _score_methods(clf, eval_builder, traj, candidates, train_freq, rng)
                 if res is None:
                     continue
-                y_true, tids, tools, method_probas, strictly_unseen = res
+                y_true, tids, tools, method_probas, strictly_unseen, lat = res
                 unseen_flags[pool_name][traj.task_id] = strictly_unseen
+                for method, ms in lat.items():
+                    latency_sum[method] = latency_sum.get(method, 0.0) + ms
+                    latency_n[method] = latency_n.get(method, 0) + 1
 
                 if "bm25" in baselines_on:
-                    method_probas["bm25"] = np.array(
-                        bm25_score_task(bm25[0], bm25[1], bm25[2], traj.intent, candidates)
-                    )
+                    proba, ms = _timed(bm25_score_task, bm25[0], bm25[1], bm25[2], traj.intent, candidates)
+                    method_probas["bm25"] = np.array(proba)
+                    latency_sum["bm25"] = latency_sum.get("bm25", 0.0) + ms
+                    latency_n["bm25"] = latency_n.get("bm25", 0) + 1
+                if "dsr_e5" in baselines_on:
+                    proba, ms = _timed(dsr_score_task, dsr[0], dsr[1], dsr[2], traj.intent, candidates)
+                    method_probas["dsr_e5"] = np.array(proba)
+                    latency_sum["dsr_e5"] = latency_sum.get("dsr_e5", 0.0) + ms
+                    latency_n["dsr_e5"] = latency_n.get("dsr_e5", 0) + 1
                 for method, proba in method_probas.items():
                     scores = task_level_scores(y_true, proba, tids, k_values=k_values)
                     for tid, metric_map in scores.items():
                         for metric, value in metric_map.items():
                             task_scores[pool_name][method][metric][tid] = value
 
-    return task_scores, unseen_flags, app_of_task, fold_idx
+    return task_scores, unseen_flags, app_of_task, fold_idx, latency_sum, latency_n
 
 
 def _repeat_prev_scores(candidates: list[dict], last_action: str) -> list[float]:
@@ -277,6 +354,7 @@ def _run_span_seed(
     baselines_on,
     k_values,
     n_folds,
+    dsr_model: str = "intfloat/e5-small-v2",
 ):
     """Span-level (per-decision, state-aware) CV + scoring for one seed.
 
@@ -292,8 +370,11 @@ def _run_span_seed(
 
     task_scores = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
     unseen_flags = defaultdict(lambda: defaultdict(dict))
+    latency_sum: dict[str, float] = {}
+    latency_n: dict[str, int] = {}
     rng = np.random.default_rng(2024 + seed)
     bm25 = build_bm25_scorer(catalog) if "bm25" in baselines_on else None
+    dsr = build_dsr_scorer(catalog, dsr_model) if "dsr_e5" in baselines_on else None
 
     feats_off = FeaturesConfig(
         include_state_features=False, include_dependency_features=False
@@ -359,16 +440,25 @@ def _run_span_seed(
                     tids = df["task_id"].values
                     tools = df["tool_name"].values
 
+                    model_p, ms = _timed(clf_state.predict_proba, df.drop(columns=["label"]))
+                    latency_sum["model_state"] = latency_sum.get("model_state", 0.0) + ms
+                    latency_n["model_state"] = latency_n.get("model_state", 0) + 1
                     probas = {
-                        "model_state": clf_state.predict_proba(df.drop(columns=["label"])),
+                        "model_state": model_p,
                         "random": rng.random(len(df)),
                         "popularity": np.array([train_freq.get(t, 0) for t in tools], dtype=float),
                         "repeat_prev": np.array(_repeat_prev_scores(candidates, last_action)),
                     }
                     if bm25 is not None:
-                        probas["bm25"] = np.array(
-                            bm25_score_task(bm25[0], bm25[1], bm25[2], traj.intent, candidates)
-                        )
+                        proba, ms = _timed(bm25_score_task, bm25[0], bm25[1], bm25[2], traj.intent, candidates)
+                        probas["bm25"] = np.array(proba)
+                        latency_sum["bm25"] = latency_sum.get("bm25", 0.0) + ms
+                        latency_n["bm25"] = latency_n.get("bm25", 0) + 1
+                    if dsr is not None:
+                        proba, ms = _timed(dsr_score_task, dsr[0], dsr[1], dsr[2], traj.intent, candidates)
+                        probas["dsr_e5"] = np.array(proba)
+                        latency_sum["dsr_e5"] = latency_sum.get("dsr_e5", 0.0) + ms
+                        latency_n["dsr_e5"] = latency_n.get("dsr_e5", 0) + 1
                     unseen = int(action not in train_freq)
                     unseen_flags[pool_name][dec_id] = unseen
 
@@ -385,13 +475,15 @@ def _run_span_seed(
                     if not rows_n:
                         continue
                     df_n = pd.DataFrame(rows_n)
-                    pn = clf_nostate.predict_proba(df_n.drop(columns=["label"]))
+                    pn, ms_n = _timed(clf_nostate.predict_proba, df_n.drop(columns=["label"]))
+                    latency_sum["model_nostate"] = latency_sum.get("model_nostate", 0.0) + ms_n
+                    latency_n["model_nostate"] = latency_n.get("model_nostate", 0) + 1
                     scores_n = task_level_scores(y, pn, df_n["task_id"].values, k_values=k_values)
                     for tid, metric_map in scores_n.items():
                         for metric, value in metric_map.items():
                             task_scores[pool_name]["model_nostate"][metric][dec_id] = value
 
-    return task_scores, unseen_flags, {}, fold_idx
+    return task_scores, unseen_flags, {}, fold_idx, latency_sum, latency_n
 
 
 def _decision_features(clf, eval_builder, traj, candidates: list[dict]):
@@ -703,18 +795,21 @@ def main() -> None:
     app_of_task = {t.task_id: t.app_name for t in tasks}
 
     per_seed = []
+    dsr_model = (cfg.get("dsr", {}) or {}).get("encoder", "intfloat/e5-small-v2")
     for s in range(n_seeds):
         if level == "span":
-            ts, uf, _app, nfolds = _run_span_seed(
+            ts, uf, _app, nfolds, ls, ln = _run_span_seed(
                 s, negatives_cfg, dataset_cfg, classifier_cfg, features_cfg,
-                tasks, catalog, app_index, tool_specs, pools_on, baselines_on, k_values, n_folds,
+                tasks, catalog, app_index, tool_specs, pools_on, baselines_on,
+                k_values, n_folds, dsr_model,
             )
         else:
-            ts, uf, _app, nfolds = _run_seed(
+            ts, uf, _app, nfolds, ls, ln = _run_seed(
                 s, negatives_cfg, dataset_cfg, classifier_cfg, features_cfg,
-                tasks, catalog, app_index, tool_specs, pools_on, baselines_on, k_values, n_folds,
+                tasks, catalog, app_index, tool_specs, pools_on, baselines_on,
+                k_values, n_folds, dsr_model,
             )
-        per_seed.append((ts, uf))
+        per_seed.append((ts, uf, ls, ln))
     fold_idx = nfolds
     primary = "model" if level == "task" else "model_state"
 
@@ -724,13 +819,24 @@ def main() -> None:
         for method in per_seed[0][0][pool_name]:
             for metric in per_seed[0][0][pool_name][method]:
                 acc: dict[str, list[float]] = defaultdict(list)
-                for ts, _uf in per_seed:
+                for ts, _uf, _ls, _ln in per_seed:
                     for tid, v in ts[pool_name][method][metric].items():
                         acc[tid].append(v)
                 for tid, vals in acc.items():
                     task_scores[pool_name][method][metric][tid] = float(np.mean(vals))
 
     unseen_flags = per_seed[0][1]  # deterministic across seeds (same fold split)
+
+    # Aggregate per-method latency (ms / decision) across seeds.
+    latency_all: dict[str, float] = {}
+    for _ts, _uf, ls, ln in per_seed:
+        for method, ms in ls.items():
+            latency_all.setdefault(method, [0.0, 0])[0] += ms
+            latency_all.setdefault(method, [0.0, 0])[1] += ln.get(method, 0)
+    latency_ms = {
+        method: (total / n if n else 0.0)
+        for method, (total, n) in latency_all.items()
+    }
 
     # 5. Aggregate + significance
     report: dict = {
@@ -748,6 +854,7 @@ def main() -> None:
         "baselines": sorted(baselines_on),
         "pools": sorted(pools_on),
         "appworld_api_spec": spec_coverage,
+        "latency_ms_per_decision": latency_ms,
     }
 
     # Unseen-overlap: at task level this is tasks whose every relevant tool is
@@ -898,6 +1005,11 @@ def _print_report(report: dict) -> None:
                 mean = us[primary].get(m, {}).get("mean")
                 cells.append(f"{mean:.3f}" if mean is not None else "   -  ")
             print("    " + primary + "  " + "  ".join(f"{c:>11}" for c in cells) + f"  (n={us[primary].get(list(us[primary])[0], {}).get('n', '?')})")
+    latency_ms = report.get("latency_ms_per_decision", {})
+    if latency_ms:
+        print("\n  latency (ms / decision; per method):")
+        for method in sorted(latency_ms, key=lambda m: latency_ms[m]):
+            print(f"    {method:<12} {latency_ms[method]:.4f} ms")
     print("\nNote: lo>0 and † means the model is significantly BETTER than baseline (Holm).")
     print("=" * 74 + "\n")
 
