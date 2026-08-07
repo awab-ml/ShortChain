@@ -435,6 +435,7 @@ def _run_calibration_analysis(
     classifier_cfg,
     features_cfg,
     n_folds: int,
+    llm_results_override: str | None = None,
 ) -> dict:
     """Cross-fold calibration + selective / LLM-fallback hybrid (task level).
 
@@ -447,6 +448,7 @@ def _run_calibration_analysis(
     """
     cal_cfg = cfg["calibration"]
     hy_cfg = cfg["hybrid"]
+    negatives_cfg.random_state = 42  # pin the calibration OOF to a fixed seed
     method = cal_cfg.get("method", "platt")
     decision = cal_cfg.get("decision", "r_precision_complete")
     n_pts = int(cal_cfg.get("thresholds_points", 41))
@@ -507,7 +509,8 @@ def _run_calibration_analysis(
 
     # Load the cost-bound LLM baseline cache.
     llm_tasks: dict = {}
-    llm_path = Path(hy_cfg.get("llm_results", "models/validation/llm_results.json"))
+    llm_path = Path(llm_results_override) if llm_results_override else Path(
+        hy_cfg.get("llm_results", "models/validation/llm_results.json"))
     if llm_path.exists():
         with open(llm_path) as f:
             llm_tasks = (json.load(f) or {}).get("tasks", {})
@@ -646,6 +649,7 @@ def main() -> None:
     parser.add_argument("--level", type=str, default=None, help="task | span")
     parser.add_argument("--calibrate", action="store_true", help="Fit cross-fold calibration + report ECE.")
     parser.add_argument("--hybrid", action="store_true", help="Report selective/hybrid metrics using cached LLM results.")
+    parser.add_argument("--llm-results", type=str, default=None, help="Override hybrid.llm_results cache path.")
     args = parser.parse_args()
 
     cfg = _load_validation_config(args.config)
@@ -843,6 +847,7 @@ def main() -> None:
         cal_report = _run_calibration_analysis(
             cfg, tasks, catalog, app_index, tool_specs,
             negatives_cfg, dataset_cfg, classifier_cfg, features_cfg, n_folds,
+            args.llm_results,
         )
         report["p4_calibration_hybrid"] = cal_report
         with open(results_file, "w") as f:
