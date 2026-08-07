@@ -23,6 +23,17 @@ eval:
 metrics:
   headline: ["r_precision", "recall_at_1", "recall_at_3", "recall_at_7", "recall_at_9", "mrr", "ndcg_at_5"]
 
+calibration:
+  method: "platt"              # platt | isotonic
+  decision: "r_precision_complete"   # task decision = full-shortlist correctness (P@R == 1); adaptive R = |relevant|
+  inner_folds: 5               # group-aware nested OOF folds for fitting the calibrator
+  thresholds_points: 41        # resolution of the risk-coverage sweep
+
+hybrid:
+  llm_results: "models/validation/llm_results.json"   # cost-bound LLM baseline cache
+  local_cost_usd: 0.0000002    # README micro-cost per local read
+  local_latency_ms: 0.3        # measured local per-task latency
+
 baselines:
   enabled: ["random", "popularity", "bm25"]
 
