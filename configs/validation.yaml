@@ -35,7 +35,10 @@ hybrid:
   local_latency_ms: 0.3        # measured local per-task latency
 
 baselines:
-  enabled: ["random", "popularity", "bm25"]
+  enabled: ["random", "popularity", "bm25", "dsr_e5"]
+
+dsr:
+  encoder: "intfloat/e5-small-v2"   # dense retrieval zero-shot baseline (E5)
 
 negatives:
   strategy: "hard"
