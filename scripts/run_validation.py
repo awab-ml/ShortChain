@@ -38,6 +38,13 @@ from sklearn.model_selection import GroupKFold
 
 from shortchain.config import ClassifierConfig, DatasetConfig, FeaturesConfig, NegativeSamplingConfig
 from shortchain.dataset.builder import DatasetBuilder
+from shortchain.evaluation.calibration import create_calibrator, expected_calibration_error
+from shortchain.evaluation.hybrid import (
+    area_under_risk_coverage,
+    coverage_at_target_risk,
+    coverage_risk_curve,
+    hybrid_curve,
+)
 from shortchain.evaluation.metrics import task_level_scores
 from shortchain.evaluation.statistics import (
     bootstrap_mean_ci,
@@ -387,6 +394,245 @@ def _run_span_seed(
     return task_scores, unseen_flags, {}, fold_idx
 
 
+def _decision_features(clf, eval_builder, traj, candidates: list[dict]):
+    """Per-task decision: full-shortlist correctness (P@R == 1).
+
+    Confidence = the highest predicted probability inside the top-R predicted
+    candidates (R = number of relevant tools); outcome = 1 iff the top-R
+    shortlist is exactly the relevant set. Top-1 correctness is usually
+    saturated (MRR == 1) and would leave calibration without variance.
+    """
+    rows = eval_builder.build_candidates(
+        traj, candidates, relevant_tools=traj.tools_used, span_index=None
+    )
+    if not rows:
+        return None
+    d = pd.DataFrame(rows)
+    p = clf.predict_proba(d.drop(columns=["label"]))
+    r = int(d["label"].values.sum())
+    if r == 0:
+        return None
+    order = np.lexsort((np.arange(len(p)), -p))[:r]  # stable top-R
+    conf = float(p[order].max())
+    pr_complete = int(int(d["label"].values[order].sum()) == r)
+    return conf, pr_complete
+
+
+def _llm_pr_complete(ranked: list[str], relevant: set[str]) -> int:
+    ranked_clean = [t for t in ranked if t]
+    top_r = set(ranked_clean[:len(relevant)])
+    return int(len(relevant & top_r) == len(relevant))
+
+
+def _run_calibration_analysis(
+    cfg: dict,
+    tasks,
+    catalog,
+    app_index,
+    tool_specs,
+    negatives_cfg,
+    dataset_cfg,
+    classifier_cfg,
+    features_cfg,
+    n_folds: int,
+    llm_results_override: str | None = None,
+) -> dict:
+    """Cross-fold calibration + selective / LLM-fallback hybrid (task level).
+
+    Every task receives an out-of-fold (OOF) prediction (the fold model was
+    trained without it). Each fold's calibrator is fit on the OTHER folds'
+    OOF (confidence, Recall@k) pairs and applied to the held-out fold — the
+    calibrator never sees that fold's tasks (no leakage), and OOF predictions
+    carry variance even when the model memorizes train tasks. The LLM cache
+    (cost-bound baseline) supplies the deferred outcomes.
+    """
+    cal_cfg = cfg["calibration"]
+    hy_cfg = cfg["hybrid"]
+    negatives_cfg.random_state = 42  # pin the calibration OOF to a fixed seed
+    method = cal_cfg.get("method", "platt")
+    decision = cal_cfg.get("decision", "r_precision_complete")
+    n_pts = int(cal_cfg.get("thresholds_points", 41))
+
+    groups = [t.task_id for t in tasks]
+    gkf = GroupKFold(n_splits=n_folds)
+    oof_by_fold: dict[int, dict[str, tuple[float, int]]] = {}
+
+    for fi, (train_idx, test_idx) in enumerate(gkf.split(tasks, groups=groups)):
+        train_trajs = [tasks[i] for i in train_idx]
+        test_trajs = [tasks[i] for i in test_idx]
+        b = DatasetBuilder(
+            config=dataset_cfg, features_config=features_cfg,
+            negatives_config=negatives_cfg, tool_catalog=catalog or None,
+            tool_specs=tool_specs,
+        )
+        df = b.build(train_trajs)
+        clf = ShortChainClassifier(classifier_cfg, features_config=features_cfg)
+        clf.fit(df.drop(columns=["label"]), df["label"])
+        eb = DatasetBuilder(
+            config=dataset_cfg, features_config=features_cfg,
+            negatives_config=negatives_cfg, tool_catalog=catalog or None,
+            corpus_stats=b.corpus_stats, tool_specs=tool_specs,
+        )
+        recs: dict[str, tuple[float, int]] = {}
+        for traj in test_trajs:
+            cands = build_candidates_for_task(traj, "catalog_wide", catalog, app_index)
+            dec = _decision_features(clf, eb, traj, cands)
+            if dec is not None:
+                recs[traj.task_id] = (dec[0], dec[1])
+        oof_by_fold[fi] = recs
+
+    # Cross-fold calibration: each fold's calibrator fits on the other folds.
+    test_rows: list[dict] = []
+    for fi, recs in oof_by_fold.items():
+        pool_conf: list[float] = []
+        pool_out: list[int] = []
+        for gj in range(n_folds):
+            if gj == fi:
+                continue
+            for _tid, (cc, oo) in oof_by_fold[gj].items():
+                pool_conf.append(cc)
+                pool_out.append(oo)
+        calibrator = None
+        if len(set(pool_out)) >= 2:
+            calibrator = create_calibrator(method).fit(
+                np.asarray(pool_conf, dtype=float), np.asarray(pool_out, dtype=int)
+            )
+        for tid, (cc, oo) in recs.items():
+            conf_cal = (
+                float(calibrator.transform(np.asarray([cc]))[0]) if calibrator else float(cc)
+            )
+            relevant = set(next(t for t in tasks if t.task_id == tid).tools_used)
+            test_rows.append({
+                "task_id": tid, "conf_raw": float(cc), "conf_cal": conf_cal,
+                "local_pr": int(oo), "relevant": sorted(relevant),
+            })
+
+    # Load the cost-bound LLM baseline cache.
+    llm_tasks: dict = {}
+    llm_path = Path(llm_results_override) if llm_results_override else Path(
+        hy_cfg.get("llm_results", "models/validation/llm_results.json"))
+    if llm_path.exists():
+        with open(llm_path) as f:
+            llm_tasks = (json.load(f) or {}).get("tasks", {})
+    n_llm = len(llm_tasks)
+
+    rows = []
+    for r in test_rows:
+        lr = llm_tasks.get(r["task_id"])
+        if lr is None:
+            continue
+        rows.append({**r, "llm_pr": _llm_pr_complete(lr.get("ranked") or [], set(r["relevant"])),
+                     "llm_cost": float(lr.get("cost_usd", 0.0)),
+                     "llm_latency": float(lr.get("latency_ms", 0.0))})
+    n_aligned = len(rows)
+    conf_raw = np.array([r["conf_raw"] for r in rows], dtype=float)
+    conf_cal = np.array([r["conf_cal"] for r in rows], dtype=float)
+    local_pr = np.array([r["local_pr"] for r in rows], dtype=float)
+    llm_pr = np.array([r["llm_pr"] for r in rows], dtype=float)
+
+    if n_aligned == 0:
+        log.warning("P4: no LLM results cached; hybrid/selective metrics unavailable (use --calibrate with --hybrid after running run_llm_baseline.py).")
+        return {
+            "decision": decision, "calibration_method": method,
+            "n_oof_points": len(test_rows), "n_llm_cached": n_llm, "n_aligned": 0,
+            "ece_raw": float("nan"), "ece_calibrated": float("nan"),
+        }
+
+    thresholds = np.asarray(
+        np.quantile(conf_cal, np.linspace(0, 1, n_pts)[1:-1]).tolist() + [1.0]
+    )
+    local_cost = float(hy_cfg.get("local_cost_usd", 2e-7))
+    local_lat = float(hy_cfg.get("local_latency_ms", 0.3))
+    llm_cost = float(np.mean([r["llm_cost"] for r in rows])) if n_aligned else 0.0
+    llm_lat = float(np.mean([r["llm_latency"] for r in rows])) if n_aligned else 0.0
+
+    ece_raw = expected_calibration_error(local_pr, conf_raw, n_bins=10)
+    ece_cal = expected_calibration_error(local_pr, conf_cal, n_bins=10)
+    local_raw_curve = coverage_risk_curve(conf_raw, local_pr, thresholds)
+    local_cal_curve = coverage_risk_curve(conf_cal, local_pr, thresholds)
+    hyb = hybrid_curve(
+        conf_cal, local_pr, llm_pr, thresholds,
+        local_cost=1.0,
+        deferred_cost=llm_cost / local_cost if local_cost else 0.0,
+        local_latency=1.0,
+        deferred_latency=llm_lat / local_lat if local_lat else 0.0,
+    )
+    llm_only_risk = 1.0 - float(llm_pr.mean()) if n_aligned else float("nan")
+    coverage_at_llm, tau_at_llm = coverage_at_target_risk(hyb, llm_only_risk)
+
+    # Aggregate LLM macro metrics (fair comparison table).
+    llm_macro: dict[str, float] = {}
+    if llm_tasks:
+        keys = set()
+        for t in llm_tasks.values():
+            keys.update(t.get("metrics", {}).keys())
+        for key in sorted(keys):
+            vals = [t["metrics"][key] for t in llm_tasks.values() if key in t.get("metrics", {})]
+            if vals:
+                llm_macro[key] = float(np.mean(vals))
+
+    report = {
+        "decision": decision,
+        "llm_macro_metrics": llm_macro,
+        "calibration_method": method,
+        "n_oof_points": len(test_rows),
+        "n_llm_cached": n_llm,
+        "n_aligned": n_aligned,
+        "ece_raw": ece_raw,
+        "ece_calibrated": ece_cal,
+        "local_risk_full": 1.0 - float(local_pr.mean()),
+        "llm_only_risk": llm_only_risk,
+        "llm_avg_cost_usd": llm_cost,
+        "llm_avg_latency_ms": llm_lat,
+        "local_avg_cost_usd": local_cost,
+        "local_avg_latency_ms": local_lat,
+        "area_local_raw": area_under_risk_coverage(local_raw_curve),
+        "area_local_calibrated": area_under_risk_coverage(local_cal_curve),
+        "area_hybrid": area_under_risk_coverage(hyb, risk_key="hybrid_risk"),
+        "coverage_at_llm_risk": coverage_at_llm,
+        "threshold_at_llm_risk": tau_at_llm,
+    }
+    report["curves"] = {
+        "tau": hyb["tau"].tolist(),
+        "coverage": hyb["coverage"].tolist(),
+        "local_risk": local_cal_curve["risk"].tolist(),
+        "hybrid_risk": hyb["hybrid_risk"].tolist(),
+        "norm_cost": hyb["norm_cost"].tolist(),
+        "norm_latency": hyb["norm_latency"].tolist(),
+    }
+    log.info(
+        f"P4: ECE {ece_raw:.3f} -> {ece_cal:.3f} | cover@LLM-risk {coverage_at_llm:.3f} "
+        f"(LLM-only risk={llm_only_risk:.3f})"
+    )
+    return report
+
+
+def _print_p4(r: dict) -> None:
+    print("\n" + "=" * 74)
+    print("  P4 — CALIBRATION & SELECTIVE / LLM-FALLBACK HYBRID (task level)")
+    print("=" * 74)
+    print(f"  decision                     : {r.get('decision','P@R==1')} (full-shortlist correctness)")
+    print(f"  calibration                 : {r['calibration_method']} (fit on {r['n_oof_points']} OOF points)")
+    print(f"  ECE (raw -> calibrated)     : {r['ece_raw']:.4f} -> {r['ece_calibrated']:.4f}")
+    print(f"  local full risk             : {r['local_risk_full']:.4f}  (1 - P@R==1)")
+    print(f"  LLM-only risk (from cache)  : {r['llm_only_risk']:.4f}  ({r['n_llm_cached']} cached, {r['n_aligned']} aligned)")
+    print(f"  coverage at LLM-parity risk : {r['coverage_at_llm_risk']:.4f}  (tau={r['threshold_at_llm_risk']:.3f})")
+    print(f"  area under risk-coverage    : local(raw)={r['area_local_raw']:.4f} "
+          f"local(cal)={r['area_local_calibrated']:.4f} hybrid={r['area_hybrid']:.4f}")
+    print("  LLM macro (cache)           : " + " ".join(
+        f"{k}={v:.3f}" for k, v in r.get("llm_macro_metrics", {}).items()
+        if k in ("r_precision", "recall_at_1", "recall_at_5", "mrr")))
+    print(f"  cost/latency per decision   : local ${r['local_avg_cost_usd']:.2e}/{r['local_avg_latency_ms']:.2f}ms | "
+          f"LLM ${r['llm_avg_cost_usd']:.2e}/{r['llm_avg_latency_ms']:.0f}ms")
+    curve = r["curves"]
+    step = max(1, len(curve["tau"]) // 8)
+    for j in range(0, len(curve["tau"]), step):
+        print(f"    cov={curve['coverage'][j]:.3f}  tau={curve['tau'][j]:.3f}  "
+              f"local_risk={curve['local_risk'][j]:.3f}  hybrid_risk={curve['hybrid_risk'][j]:.3f}  "
+              f"cost={curve['norm_cost'][j]:.2f}x  latency={curve['norm_latency'][j]:.2f}x")
+    print("=" * 74 + "\n")
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -401,6 +647,9 @@ def main() -> None:
     parser.add_argument("--seeds", type=int, default=None, help="Override seeds (training seeds).")
     parser.add_argument("--seed", type=int, default=None, help="Override bootstrap seed.")
     parser.add_argument("--level", type=str, default=None, help="task | span")
+    parser.add_argument("--calibrate", action="store_true", help="Fit cross-fold calibration + report ECE.")
+    parser.add_argument("--hybrid", action="store_true", help="Report selective/hybrid metrics using cached LLM results.")
+    parser.add_argument("--llm-results", type=str, default=None, help="Override hybrid.llm_results cache path.")
     args = parser.parse_args()
 
     cfg = _load_validation_config(args.config)
@@ -592,6 +841,21 @@ def main() -> None:
     log.info(f"Saved report to {results_file}")
 
     _print_report(report)
+
+    # P4: calibration + selective / LLM-fallback hybrid (task level only).
+    if (args.calibrate or args.hybrid) and level == "task":
+        cal_report = _run_calibration_analysis(
+            cfg, tasks, catalog, app_index, tool_specs,
+            negatives_cfg, dataset_cfg, classifier_cfg, features_cfg, n_folds,
+            args.llm_results,
+        )
+        report["p4_calibration_hybrid"] = cal_report
+        with open(results_file, "w") as f:
+            json.dump(report, f, indent=2, default=float)
+        _print_p4(cal_report)
+    elif (args.calibrate or args.hybrid) and level != "task":
+        log.warning("--calibrate/--hybrid apply to task-level only; skipped for level=%s", level)
+
     log.info(f"Total runtime: {time.time() - t0:.1f}s")
 
 
