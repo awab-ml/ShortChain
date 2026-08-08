@@ -1,0 +1,23 @@
+# E5 embedding experiment — context/tool text encoded with E5 instead of TF-IDF
+# =============================================================================
+# Experiment: replace the TF-IDF text encoding of the model's features with
+# intfloat/e5-small-v2 dense embeddings (features.text_encoder = "e5-small").
+# This affects every text column the FeaturePipeline encodes (intent, previous
+# tools, last thought, tool name/description, history summary, last
+# observation); the numerical/schema/categorical features and the baselines
+# (random / popularity / BM25 / DSR-E5) are unchanged, so the comparison is
+# model(E5-text) vs model(TF-IDF-text) vs the same baselines on identical rows.
+#
+# Run (keep the experiment branch unmerged until results are compared):
+#
+#   python scripts/run_validation.py --config configs/experiment_e5.yaml \
+#       --level task --seeds 5 --output-dir models/validation/e5_task
+#   python scripts/run_validation.py --config configs/experiment_e5.yaml \
+#       --level span  --seeds 1 --output-dir models/validation/e5_span
+#
+# Note: the harness pins KMP_DUPLICATE_LIB_OK/OpenMP threads so torch (E5) and
+# XGBoost coexist safely; the model is downloaded & cached on first run.
+
+features:
+  text_encoder: "e5-small"      # tfidf (baseline) | e5-small | auto
+  e5_model_name: "intfloat/e5-small-v2"

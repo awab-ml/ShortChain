@@ -88,18 +88,39 @@ log = get_logger(__name__)
 # Config
 # ---------------------------------------------------------------------------
 
+def _deep_merge_dict(base: dict, override: dict) -> dict:
+    """Recursively merge *override* into *base* (nested dicts are merged)."""
+    merged = dict(base)
+    for key, value in override.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = _deep_merge_dict(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
 def _load_validation_config(path: str | Path | None) -> dict:
+    """Load the validation config, deep-merging over ``configs/validation.yaml``.
+
+    Experiment configs can therefore override only what they change
+    (e.g. ``features.text_encoder``) and inherit the rest of the protocol
+    settings.
+    """
+    default = Path(__file__).resolve().parent.parent / "configs" / "validation.yaml"
+    with open(default) as f:
+        base = yaml.safe_load(f) or {}
     if path is None:
-        path = Path(__file__).resolve().parent.parent / "configs" / "validation.yaml"
+        return base
     with open(path) as f:
-        return yaml.safe_load(f) or {}
+        override = yaml.safe_load(f) or {}
+    return _deep_merge_dict(base, override)
 
 
 def _build_model_configs(cfg: dict):
     negatives = NegativeSamplingConfig(**cfg["negatives"], random_state=42)
     dataset = DatasetConfig(**cfg["dataset"])
     classifier = ClassifierConfig(**cfg["classifier"])
-    features = FeaturesConfig()
+    features = FeaturesConfig(**(cfg.get("features") or {}))
     return negatives, dataset, classifier, features
 
 
