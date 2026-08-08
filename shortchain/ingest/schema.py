@@ -3,6 +3,20 @@
 These models define the internal representation of agent execution traces.
 External formats are mapped to these models via configurable field mappings
 in the loader.
+
+Conceptual model
+----------------
+- A ``Trajectory`` is ONE task/instruction, with ``intent`` (the user goal),
+  ``app_name``, and an ordered ``spans`` list (``Span`` = one action + its
+  thought/observation).
+- ``tools_used`` is derived automatically as the set of distinct tool names
+  called (used for task-level labels); ``tool_sequence`` keeps the ordered
+  (possibly repeated) call list for per-decision / state features.
+- A `span_index` selects the "decision point": context features read only the
+  spans BEFORE it (see ``features/context.py``), which is what lets the same
+  schema power both task-level selection and per-decision selection.
+Spans carry ``metadata`` (e.g. ``step_index``) so heterogeneous trace formats
+map cleanly without polluting the common fields.
 """
 
 from __future__ import annotations

@@ -10,10 +10,23 @@ Protocol (paper-aligned, leakage-free):
   train-side tool catalog: catalog-wide (all tools) and app-scoped (the
   task's apps).
 - Baselines scored on the SAME candidate rows: random, popularity (train-side
-  tool frequency), BM25 (TF-IDF cosine, fit on catalog documents only).
+  tool frequency), BM25 (TF-IDF cosine, fit on catalog documents only), and
+  DSR-E5 (zero-shot dense retrieval).
 - Per-task metric values are pooled over test folds and macro-averaged with
   paired-bootstrap 95% CIs; model vs. baseline contrasts get Holm-Bonferroni
-  control within each metric.
+  control within each metric. Per-method latency is measured per decision.
+
+Techniques worth knowing
+------------------------
+- Every table row is anchored by the RANDOM baseline so a number is never read
+  in isolation (tiny candidate pools can make even mediocre rankings look
+  strong when random is high).
+- Dense (E5) baselines load torch; XGBoost loads libomp — together they can
+  segfault on duplicate OpenMP runtimes, so the harness pins
+  ``KMP_DUPLICATE_LIB_OK`` and ``OMP_NUM_THREADS`` before either loads.
+- ``--calibrate``/``--hybrid`` add the P4 analysis: cross-fold, group-aware
+  calibration (ECE) and selective / LLM-fallback metrics driven by a cached,
+  cost-bound LLM baseline (see ``run_llm_baseline.py``).
 """
 
 from __future__ import annotations

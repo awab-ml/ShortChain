@@ -4,11 +4,23 @@ Implements the **pointwise reduction** strategy from the ShortChain methodology:
 for each trajectory, create positive pairs for tools actually used and
 negative pairs for sampled tools from the catalog that were *not* used.
 
+A single model then learns ``p(correct | context, tool)`` and ranks candidates
+by that score at inference — no per-step LLM calls.
+
 Phase 2 upgrades:
 - Uses ``ContextFeatureBuilder`` for richer, state-aware context features.
 - Uses ``ToolFeatureBuilder`` for corpus-enriched tool features.
 - Delegates negative sampling to pluggable ``NegativeSampler`` strategies.
 - Precomputes ``CorpusStats`` from the training trajectories.
+
+Leak-free invariant
+-------------------
+``CorpusStats`` (tool frequency / co-occurrence / app-tool counts) are frozen
+on the TRAINING set and reused — ``build()`` never recomputes them from the
+incoming trajectories, and ``build_candidates()`` refuses to run without
+frozen stats. Recomputing from evaluation data would leak the answers into
+the features. This invariant keeps task-level and per-decision evaluation
+honest.
 """
 
 from __future__ import annotations

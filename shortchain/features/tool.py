@@ -3,6 +3,17 @@
 Builds features for a candidate tool, optionally enriched with
 corpus-level statistics (frequency, co-occurrence) and context
 (app-matching).
+
+Notes
+-----
+- ``tool_name`` / ``tool_description`` are the textual view of the candidate
+  and are what the TF-IDF / dense encoders and the BM25 / DSR baselines see.
+- Schema features (argument count, type distribution, enum presence) come
+  from the tool's typed definition (``tool_specs``). They are *static, per-tool
+  metadata* — never task- or test-specific — so using them cannot leak
+  evaluation answers.
+- Corpus-derived features (``tool_frequency``, ``tool_co_occurrence``) read
+  from a frozen ``CorpusStats`` built on the training set only.
 """
 
 from __future__ import annotations

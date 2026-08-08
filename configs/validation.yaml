@@ -1,8 +1,16 @@
 # ShortChain P0 Validation — AppWorld (HALO Gemini traces)
 # ========================================================
 # Protocol: task-level 5-fold, frozen train corpus stats, faithful candidate
-# pools (catalog-wide + app-scoped), baselines (random, popularity, BM25),
-# macro metrics with paired-bootstrap 95% CI.
+# pools (catalog-wide + app-scoped), baselines (random, popularity, BM25,
+# DSR-E5), macro metrics with paired-bootstrap 95% CI.
+#
+# Concepts:
+# - "level": task = one decision per task (recover its full tool set); span =
+#   one decision per step (predict the next tool given the current state).
+# - "calibration/hybrid" (flags): cross-fold group-aware calibration (ECE) plus
+#   selective prediction with a cost-bound LLM fallback (cached results).
+# - "appworld_api_dir": path to api_docs/function_calling — supplies the tool
+#   descriptions + argument schemas used for schema features and baselines.
 
 level: task   # task | span (span = per-decision, state-aware P1)
 

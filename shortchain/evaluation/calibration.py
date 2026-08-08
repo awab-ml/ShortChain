@@ -8,6 +8,21 @@ threshold becomes a meaningful, actionable "defer to LLM" rule.
 Leak-safe usage: the calibrator must be fit only on TRAIN-task scores (e.g.
 group-aware out-of-fold scores) and applied to test-task scores. Fitting it
 on test data would leak — that is a hard invariant here.
+
+How it is fitted (cross-fold, group-aware)
+------------------------------------------
+In the validation harness each calibration point is an *out-of-fold* decision
+from a fold model trained without that task. Every fold's calibrator is fit on
+the OTHER folds' points and applied to its own held-out fold — so no task ever
+contributes to the calibrator that will score it. Because out-of-fold scores
+carry real variance (unlike in-sample train predictions), the fit is
+non-degenerate even when the underlying model memorises training tasks.
+
+Choice of method
+----------------
+Platt (logistic on log-odds) is the default: it is robust with small OOF
+samples. Isotonic is a monotone alternative when more calibration data is
+available.
 """
 
 from __future__ import annotations

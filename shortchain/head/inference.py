@@ -2,6 +2,15 @@
 
 Loads a trained classifier, scores candidate tools against a context,
 and returns a ranked shortlist.
+
+Role in the stack
+-----------------
+This is the platform-facing runtime entry point (~1ms, on-device): given the
+current context (e.g. intent + prior state) and the candidate tools available
+at that moment, it returns ``[(tool, confidence), …]`` ranked descending.
+The platform calls this whenever it would otherwise invoke an LLM shortlister;
+the model and its feature pipeline were both fitted on the training set and
+are not modified at inference time.
 """
 
 from __future__ import annotations

@@ -4,6 +4,18 @@ Implements the head-matched metrics from the ShortChain methodology:
 - R-precision (P@R): adapts cutoff to the task's relevant-set size
 - Recall@k: fixed-budget recovery at k ∈ {3, 5, 7, 9}
 - Standard classification metrics: accuracy, precision, recall, F1, AUC
+
+Which metric to foreground
+--------------------------
+- **P@R** is deliberately strict: the cutoff equals the number of relevant
+  tools, leaving no "slack window", so it emphasises ranking fidelity and is
+  the completeness claim.
+- **Recall@k** measures how many relevant tools are recovered under a fixed
+  production budget (k candidates) — the metric an agent actually consumes.
+- Accuracy/precision/recall/F1/AUC are classification diagnostics and NOT the
+  benchmark result (the ranking task is measured by P@R / Recall@k).
+Both P@R and Recall@k are macro-averaged per task, so every task contributes
+equally regardless of candidate-pool size or relevant-set size.
 """
 
 from __future__ import annotations

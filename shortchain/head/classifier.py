@@ -12,6 +12,16 @@ Architecture Overview:
   ``FeaturePipeline`` module.
 - **Backward Compatibility**: Automated fallback detection during model deserialization
   (`ShortChainClassifier.load`) allowing seamless inference on Phase 1 legacy models.
+
+Learning & inference contract
+-----------------------------
+`fit(X, y)` trains the backend AND the `FeaturePipeline` (fitted encoders) on
+the supplied rows — in the harness these are TRAIN / fold-train rows only.
+`predict_proba` then encodes via the fitted pipeline and returns the positive
+class probability, which the inference engine sorts to rank candidate tools.
+There is deliberately no test-time fitting anywhere: everything that encodes
+or learns is built from the training set, so evaluation rows are projected
+onto a fixed, train-derived space.
 """
 
 from __future__ import annotations

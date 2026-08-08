@@ -7,10 +7,17 @@ Provides pluggable strategies for selecting negative (label=0) tools:
 - ``MixedSampler``: configurable mix of random + hard negatives.
 
 Use ``create_sampler()`` as the factory entry-point.
+
+Why negatives matter
+--------------------
+The classifier must learn to separate the *relevant* tool from *plausible*
+alternatives (e.g. other tools of the same app), not just from random noise.
+Hard negatives (same-app / co-usage / description-similar) teach that
+boundary and produce shortlists that generalise to real candidate pools.
+Selection is fully deterministic (sorted pools + tie-breaks) so experiments
+are reproducible regardless of the process hash seed.
 """
 from __future__ import annotations
-
-
 
 import random
 

@@ -4,6 +4,17 @@ Extracts state-aware context features from a trajectory, optionally
 at a specific span index.  Designed for trajectory-level use now
 (``span_index=None``) with a clean migration path to span-level
 feature extraction in future phases.
+
+No-lookahead contract
+---------------------
+For a decision at ``span_index=k``, ALL features are derived strictly from
+``traj.spans[:k]`` (the steps that already happened): ``previous_tools``,
+``last_action``/``last_observation``, ``history_summary``,
+``unique_tools_so_far``, ``tool_diversity``. The current step ``k`` and every
+later step are never read — per-decision training/evaluation cannot leak the
+answer through the context. ``history_summary`` concatenates the last five
+(Action → observation-snippet) pairs so the model sees a compact trace of the
+recent state, mirroring what a deployed agent would actually observe.
 """
 
 from __future__ import annotations

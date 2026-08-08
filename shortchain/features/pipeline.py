@@ -14,6 +14,18 @@ Key Features:
   - Numerics: Parsed, cleaned, imputed with 0, and passed through as float32 matrices.
   - Booleans: Formatted directly into 0.0/1.0 float32 arrays.
 - **Serialization**: Full pickle-based save and load support for production persistence.
+
+Leak-free encoding
+------------------
+Encoding is fitted ONLY on the training sample (``fit_transform`` in
+``ShortChainClassifier.fit``); evaluation rows are passed through
+``transform`` with the *fitted* encoders. Unknown categorical levels map to
+``-1`` and text is projected onto the training vocabulary, so unseen test
+values cannot teach the model anything new at inference time.
+Layout note: ``_TEXT_COLS``/``_NUM_COLS``/``_BOOL_COLS``/``_CAT_COLS`` list
+YOUR candidate schema. Columns present in a DataFrame are encoded; columns
+absent are silently skipped — which keeps the pipeline backward compatible as
+feature groups are added or removed.
 """
 
 from __future__ import annotations

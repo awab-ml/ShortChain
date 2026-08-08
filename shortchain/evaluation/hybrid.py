@@ -9,6 +9,20 @@ Deployment pattern (paper's "complementary deployment"):
 Everything here is a pure function of per-task arrays so it can be wrapped in
 the existing paired-bootstrap / CI machinery. Thresholds are swept and
 reported as a risk-coverage curve; they are never tuned on the test set.
+
+Terminology
+-----------
+- A *decision* is a binary outcome: whether the produced shortlist was
+  correct (e.g. top-R exactly relevant at task level, next-tool correct at
+  span level). Its raw/calibrated probability is the *confidence*.
+- *Coverage* = fraction of decisions handled locally (kept).
+- *Risk* = 1 - accuracy (share of incorrect decisions).
+- The **risk-coverage curve** sweeps the deferral threshold: as confidence
+  must be higher to keep a decision, coverage falls and (usually) risk on the
+  kept set falls. Integrating risk over coverage summarises the trade-off.
+- **Coverage at parity risk** asks: at what coverage can we stay at or above
+  a target accuracy (e.g. the LLM-only accuracy) — the honest answer to "how
+  much can we afford to keep local?".
 """
 
 from __future__ import annotations
