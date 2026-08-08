@@ -742,6 +742,31 @@ def _print_p4(r: dict) -> None:
 # Main
 # ---------------------------------------------------------------------------
 
+def _span_step_bucket_r1(dec_scores: dict) -> dict:
+    """Mean per-decision R@1 by decision depth (parsed from ``task:step`` keys).
+
+    Returns ``{bucket_label: {"r1": mean, "n": count}}`` for non-empty buckets.
+    Buckets: step 0 (no prior state), steps 1-2, 3-9, 10+.
+    """
+    depth_buckets = [(0, "step_0"), (1, "steps_1_2"), (3, "steps_3_9"), (10, "steps_10+")]
+    acc: dict[str, tuple[list[float], int]] = {label: ([], 0) for _, label in depth_buckets}
+    for dec_id, v in dec_scores.items():
+        try:
+            step = int(str(dec_id).rsplit(":", 1)[1])
+        except (ValueError, IndexError):
+            step = 0
+        # bounds are ascending; take the LARGEST bound <= step (descending scan).
+        label = next((lab for lo, lab in reversed(depth_buckets) if step >= lo), "steps_10+")
+        vals, n = acc[label]
+        vals.append(v)
+        acc[label] = (vals, n + 1)
+    return {
+        label: {"r1": round(float(np.mean(vals)), 4), "n": n}
+        for label, (vals, n) in acc.items()
+        if n > 0
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run ShortChain P0 AppWorld validation.")
     parser.add_argument("--config", type=str, default=None, help="Path to validation.yaml.")
@@ -954,6 +979,20 @@ def main() -> None:
 
     report["results"] = per_pool
 
+    # Span-level capability view: next-tool accuracy (R=1 per decision) by
+    # decision depth - how much state helps at step 0 (no prior context) vs.
+    # after several steps. Buckets are parsed from the decision ids.
+    if level == "span":
+        step_report: dict = {}
+        for pool_name in pools_on:
+            step_report[pool_name] = {}
+            for method in ("model_state", "model_nostate"):
+                scores = task_scores[pool_name].get(method, {}).get("r_precision", {})
+                if scores:
+                    step_report[pool_name][method] = _span_step_bucket_r1(scores)
+        report["span_step_buckets"] = step_report
+
+
     # 6. console + persist
     results_file = out_dir / "evaluation_results.json"
     with open(results_file, "w") as f:
@@ -1023,6 +1062,21 @@ def _print_report(report: dict) -> None:
         print("\n  latency (ms / decision; per method):")
         for method in sorted(latency_ms, key=lambda m: latency_ms[m]):
             print(f"    {method:<12} {latency_ms[method]:.4f} ms")
+    step_rep = report.get("span_step_buckets")
+    if step_rep:
+        print("\n  R@1 (next-tool correct) by decision depth (catalog_wide):")
+        pool = step_rep.get("catalog_wide", {})
+        labels = ["step_0", "steps_1_2", "steps_3_9", "steps_10+"]
+        print("    depth      " + "  ".join(f"{lab:>10}" for lab in labels))
+        for method in ("model_state", "model_nostate"):
+            cells = []
+            counts = []
+            for lab in labels:
+                b = pool.get(method, {}).get(lab)
+                cells.append(f"{b['r1']:.3f}" if b else "   -  ")
+                counts.append(str(b["n"]) if b else "-")
+            print("    " + f"{method:<10} " + "  ".join(f"{c:>10}" for c in cells))
+            print("    n          " + "  ".join(f"{c:>10}" for c in counts))
     print("\nNote: lo>0 and † means the model is significantly BETTER than baseline (Holm).")
     print("=" * 74 + "\n")
 

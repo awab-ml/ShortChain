@@ -7,6 +7,7 @@ import importlib.util
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 _ROOT = Path(__file__).resolve().parent.parent
 _spec = importlib.util.spec_from_file_location(
@@ -58,3 +59,13 @@ def test_timed_returns_elapsed():
         return x * 2
     result, ms = rv._timed(fn, 3)
     assert result == 6 and ms >= 0.0
+
+
+def test_span_step_bucket_r1():
+    scores = {"t:0": 0.0, "t:1": 1.0, "t:2": 0.0, "t:5": 1.0, "t:6": 1.0,
+              "t:12": 1.0, "t:3": 0.0}
+    out = rv._span_step_bucket_r1(scores)
+    assert out["step_0"]["r1"] == 0.0 and out["step_0"]["n"] == 1
+    assert out["steps_1_2"]["r1"] == pytest.approx(0.5) and out["steps_1_2"]["n"] == 2
+    assert out["steps_3_9"]["r1"] == round(2 / 3, 4) and out["steps_3_9"]["n"] == 3
+    assert out["steps_10+"]["r1"] == 1.0 and out["steps_10+"]["n"] == 1
