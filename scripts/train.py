@@ -8,6 +8,14 @@ Usage::
         --model xgboost \\
         --folds 5 \\
         --output models/shortchain.pkl
+
+Concept
+-------
+Runs group-aware cross-validation (folds keep whole tasks together, so the
+same task never appears in both train and validation) and then trains the
+final model on all of the training data. Classification-over-candidates is
+the point: at inference the model scores each candidate tool and we rank by
+probability, so the *ranking* quality is what matters.
 """
 
 from __future__ import annotations

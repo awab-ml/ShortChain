@@ -6,7 +6,16 @@ Usage::
     python scripts/build_dataset.py \\
         --trajectories data/example/ \\
         --output data/datasets/ \\
-        --config configs/default.yaml
+        --config configs/example.yaml
+
+Concept
+-------
+Converts trajectories into the pointwise ``(context, tool, label)`` rows the
+classifier learns from: for each trajectory, every tool actually used becomes
+a positive row and every negative is sampled from the catalog. Context and
+tool features are composed by the builders (see ``features/``); the output
+is ``train.csv``/``test.csv`` split at the task level (no task leaks across
+the split).
 """
 
 from __future__ import annotations

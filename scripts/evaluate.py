@@ -6,6 +6,14 @@ Usage::
     python scripts/evaluate.py \\
         --model models/shortchain.pkl \\
         --dataset data/datasets/test.csv
+
+Concept
+-------
+Reports head-matched ranking metrics on the held-out test rows: R-Precision
+(P@R, adaptive to the relevant-set size) and Recall@k (fixed budget). This
+script evaluates an already-built dataset; for the full leak-free benchmark
+(feature construction from traces, baselines, bootstrap CIs) use
+``scripts/run_validation.py`` with ``--level task|span``.
 """
 
 from __future__ import annotations

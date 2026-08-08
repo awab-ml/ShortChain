@@ -9,6 +9,15 @@ Note:
 
 Future versions may add stratification using metadata such as app name
 or tool-count buckets.
+
+Why grouping matters
+--------------------
+Every positive/negative row belongs to a task; if a task's rows reach both
+train and validation, the model can effectively memorise the scenario and
+validation looks optimistic. For per-decision (span) use the same guarantee
+applies at the task level: all of a task's decisions stay in one fold, so the
+"state" features — built only from steps before each decision — are always
+out-of-fold for the model that scores them.
 """
 
 from __future__ import annotations
