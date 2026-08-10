@@ -22,7 +22,7 @@ htmlcov/
 .tox/
 
 # IDE / Editor
-.vscode/
+
 .idea/
 *.swp
 *.swo
