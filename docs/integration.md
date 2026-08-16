@@ -135,9 +135,69 @@ def choose_tool(context: dict, tool_catalog: list[dict], llm) -> str:
 
 ## Span-by-Span Integration
 
-### 1. Collect Agent Logs
+### 0. Production: Collect Traces with the SDK (OpenTelemetry)
 
-Your agent must log its execution traces. At minimum, each log entry needs:
+Production collections should **not** be hand-dumped JSONL. ShortChain ships an
+SDK that enables the published OpenLLMetry instrumentations (LangChain,
+OpenAI Agents, CrewAI, Agno, MCP, Anthropic, LiteLLM) and exports standard
+OTLP traces to a small in-repo receiver that projects them onto the training
+schema automatically.
+
+```python
+# pip install "shortchain[sdk,receiver]"
+import os
+from shortchain.sdk import ShortChain
+
+ShortChain.init(
+    api_key=os.environ["SHORTCHAIN_API_KEY"],
+    app_name="support-agent",
+    endpoint=os.environ.get("SHORTCHAIN_ENDPOINT", "http://127.0.0.1:4318"),
+)
+# existing LangChain / OpenAI / CrewAI / MCP code still runs — instrumentors are enabled automatically
+
+def handle_request(req):
+    ShortChain.set_task(task_id=req.id, intent=req.text, app_name="support-agent")
+    try:
+        result = agent.run(req.text)          # OpenLLMetry children nest under the root
+        ShortChain.end_task(success=bool(result.ok))
+        return result
+    except Exception:
+        ShortChain.end_task(success=False)
+        raise
+```
+
+Run the receiver (workers are locked to 1; `data/runtime/*` is secret material):
+
+```bash
+python -m shortchain.runtime receive --config configs/runtime.yaml
+```
+
+Then train on the collected traces (the default field map already matches the
+projected JSONL; pass the receiver's tool catalog so tool descriptions feed
+the text encoder):
+
+```bash
+python scripts/build_dataset.py \
+    --trajectories data/runtime/trajectories.jsonl \
+    --catalog data/runtime/catalog.json \
+    --output data/datasets/runtime \
+    --config configs/runtime.yaml
+python scripts/train.py --dataset data/datasets/runtime --output models/shortchain.pkl
+```
+
+Quality rules you must know:
+
+| Rule | Why |
+|---|---|
+| `set_task`…`end_task(success=...)` is **required** for trainable traces | Without it the success signal is unknown and the quality gate drops the trace (`success_status=unknown`). Training on unlabelled spans would teach the failing policy. |
+| `end_task` must be called for human-in-the-loop / slow tools | The receiver's 30s idle timeout is a safety net, not a contract. |
+| Content tracing is ON by default | Prompts / tool results are needed to extract `intent` and `observation`. Only run the receiver on infrastructure you trust. |
+| `data/runtime/trajectories.jsonl` is created with mode `0600` | Treat it like a dump of production logs. |
+
+### 1. Offline / Benchmark Data: Collect Agent Logs
+
+For benchmarks, tests, and offline dumps, ShortChain also reads JSON/JSONL
+directly. Each log entry needs:
 
 ```json
 {
@@ -308,10 +368,17 @@ Models should be retrained when:
 Retraining is fast (~5 seconds for 1000 trajectories) and can be automated:
 
 ```bash
-# Automated retraining script
+# Automated retraining script (offline logs)
 python scripts/build_dataset.py --trajectories logs/latest/ --output data/datasets/
 python scripts/train.py --dataset data/datasets/ --output models/shortchain_v2.pkl
 python scripts/evaluate.py --model models/shortchain_v2.pkl --dataset data/datasets/test.csv
+
+# …or retrain on live runtime traces (SDK + receiver)
+python scripts/build_dataset.py \
+    --trajectories data/runtime/trajectories.jsonl \
+    --catalog data/runtime/catalog.json \
+    --output data/datasets/runtime
+python scripts/train.py --dataset data/datasets/runtime --output models/shortchain.pkl
 
 # If metrics are good, swap the model:
 mv models/shortchain_v2.pkl models/shortchain.pkl
