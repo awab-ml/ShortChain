@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import pytest
+
+pytest.importorskip("opentelemetry")
+
 from opentelemetry import trace
 
 from shortchain.runtime import task_span as ts

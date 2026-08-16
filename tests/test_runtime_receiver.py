@@ -7,6 +7,11 @@ import gzip as gzip_mod
 import json
 from pathlib import Path
 
+import pytest
+
+pytest.importorskip("opentelemetry.proto")
+pytest.importorskip("starlette")
+
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )

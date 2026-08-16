@@ -17,6 +17,13 @@ Conceptual model
   schema power both task-level selection and per-decision selection.
 Spans carry ``metadata`` (e.g. ``step_index``) so heterogeneous trace formats
 map cleanly without polluting the common fields.
+
+This module is the **canonical training schema**, not "the file format".
+OTEL / OpenLLMetry traces are projected onto these models. Extra keys live
+in ``Span.metadata`` / ``Trajectory.metadata``. Reserved projector keys
+(ignored by features today): ``otel.trace_id``, ``otel.span_id``,
+``success_source`` (``association`` / ``unknown`` / …),
+``projection.framework``, ``projection.fallback``, token sums.
 """
 
 from __future__ import annotations

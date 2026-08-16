@@ -1,4 +1,4 @@
-> **Superseded (2026-08-15).** Implementation spec is now [`docs/design-otel-oneline-collection.md`](design-otel-oneline-collection.md): true one-line `ShortChain.init()`, in-process collect, optional sidecar/`set_task`. This rev 5 document is retained as the rejected sidecar-first / mandatory-wrap alternative.
+> **Implemented on `main2` (PRs 1–7 + display-endpoint hook).** This is the v1 production-collection spec that shipped: OpenLLMetry instrumentations, SDK-owned `shortchain.task` root, thin OTLP HTTP receiver, server-side projection onto `Trajectory`. Offline JSONL remains the benchmark / example path.
 
 # Replace File-Based Production Ingest with OpenLLMetry / OpenTelemetry
 

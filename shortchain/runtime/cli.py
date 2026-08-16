@@ -22,7 +22,6 @@ from shortchain.runtime.assembler import (
     RuntimeMetrics,
     TraceAssembler,
 )
-from shortchain.runtime.receiver import create_receiver_app
 from shortchain.utils.logging import get_logger
 
 log = get_logger(__name__)
@@ -121,6 +120,8 @@ def main(argv: list[str] | None = None) -> None:
 def run_receive(args: argparse.Namespace) -> None:
     """Start the assembled receiver with uvicorn (workers=1)."""
     import uvicorn
+
+    from shortchain.runtime.receiver import create_receiver_app
 
     config = _config_from_args(args)
     if args.out:

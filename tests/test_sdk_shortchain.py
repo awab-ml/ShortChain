@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import sys
 
+import pytest
+
+pytest.importorskip("opentelemetry.sdk.trace")
+
 import shortchain.runtime.sdk as sdk_mod
 from shortchain.sdk import ShortChain
 from shortchain.runtime import instrument as inst

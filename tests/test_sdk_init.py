@@ -6,6 +6,10 @@ import json
 import types
 from pathlib import Path
 
+import pytest
+
+pytest.importorskip("opentelemetry.sdk.trace")
+
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
