@@ -8,6 +8,14 @@ Usage::
         --output data/datasets/ \\
         --config configs/example.yaml
 
+Runtime (OTEL) data::
+
+    python scripts/build_dataset.py \\
+        --trajectories data/runtime/trajectories.jsonl \\
+        --catalog data/runtime/catalog.json \\
+        --output data/datasets/runtime \\
+        --config configs/runtime.yaml
+
 Concept
 -------
 Converts trajectories into the pointwise ``(context, tool, label)`` rows the
@@ -16,17 +24,21 @@ a positive row and every negative is sampled from the catalog. Context and
 tool features are composed by the builders (see ``features/``); the output
 is ``train.csv``/``test.csv`` split at the task level (no task leaks across
 the split).
+
+``--catalog`` supplies ``{tool_name: description}`` (e.g. the receiver's
+``data/runtime/catalog.json``); without it the catalog is derived from the
+trajectories themselves.
 """
 
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
 from shortchain.config import load_config
 from shortchain.dataset.builder import DatasetBuilder
 from shortchain.dataset.splitter import GroupStratifiedSplitter
 from shortchain.ingest.loader import load_trajectories
+from shortchain.runtime.catalog import load_catalog_file
 from shortchain.utils.io import ensure_dir
 from shortchain.utils.logging import get_logger
 
@@ -56,6 +68,14 @@ def main() -> None:
         help="Path to a YAML config file (overrides defaults).",
     )
     parser.add_argument(
+        "--catalog",
+        type=str,
+        default=None,
+        help="Path to a tool catalog JSON ({tool_name: description}); "
+        "runtime writes this to data/runtime/catalog.json. User entries "
+        "win over any discovered during loading.",
+    )
+    parser.add_argument(
         "--no-split",
         action="store_true",
         help="Don't create train/test split; output a single dataset.",
@@ -72,9 +92,19 @@ def main() -> None:
         log.error("No trajectories loaded. Check path and format.")
         return
 
+    # 1b. Optional user tool catalog (runtime-projected trajectories usually
+    # ship a catalog.json next to them — descriptions feed TF-IDF/BM25).
+    tool_catalog: dict[str, str] | None = None
+    if args.catalog:
+        tool_catalog = load_catalog_file(args.catalog)
+        log.info(
+            f"[bold]Catalog:[/bold] loaded {len(tool_catalog)} tools "
+            f"from {args.catalog}"
+        )
+
     # 2. Build dataset
     log.info("[bold]Span 2:[/bold] Building (context, tool, label) pairs")
-    builder = DatasetBuilder(config=cfg.dataset)
+    builder = DatasetBuilder(config=cfg.dataset, tool_catalog=tool_catalog)
     df = builder.build(trajectories)
 
     # 3. Split
