@@ -719,3 +719,168 @@ def _assistant_text_before_tool_calls(span: OtelSpan) -> str:
                 if isinstance(content, str) and content.strip():
                     results.append(content)
     return " ".join(results).strip()
+
+
+# ---------------------------------------------------------------------------
+# Ordering + MCP twin dedup (ancestry / role, never a time window)
+# ---------------------------------------------------------------------------
+#
+# MCP client + server emit two tool spans per call (FastMCP tests). Dedup is
+# ancestry/role based: a 2s same-name window would also collapse retries and
+# parallel same-name calls, which must stay separate decisions.
+
+
+def _ancestors(span: OtelSpan, by_id: dict[str, OtelSpan]) -> list[OtelSpan]:
+    chain: list[OtelSpan] = []
+    current = by_id.get(span.parent_span_id or "")
+    seen: set[str] = set()
+    while current is not None and current.span_id not in seen:
+        seen.add(current.span_id)
+        chain.append(current)
+        current = by_id.get(current.parent_span_id or "")
+    return chain
+
+
+def _is_ancestor(
+    candidate: OtelSpan,
+    span: OtelSpan,
+    by_id: dict[str, OtelSpan],
+) -> bool:
+    return any(a.span_id == candidate.span_id for a in _ancestors(span, by_id))
+
+
+def _depth(span: OtelSpan, by_id: dict[str, OtelSpan]) -> int:
+    return len(_ancestors(span, by_id))
+
+
+def _mcp_role(span: OtelSpan, by_id: dict[str, OtelSpan]) -> str:
+    """mcp_server | mcp_client | other."""
+    ancestors = _ancestors(span, by_id)
+    for node in [span, *ancestors]:
+        if _kind(node) == "server" or "mcp.server" in node.name:
+            return "mcp_server"
+    if span.name == "tools/call.tool":
+        return "mcp_client"
+    if _first_attr(span.attributes, "mcp.method.name") == "tools/call":
+        return "mcp_client"
+    for node in ancestors:
+        if _kind(node) == "session" or "mcp.client.session" in node.name:
+            return "mcp_client"
+    return "other"
+
+
+def _shared_mcp_context(
+    a: OtelSpan,
+    b: OtelSpan,
+    by_id: dict[str, OtelSpan],
+) -> bool:
+    a_chain = {s.span_id for s in _ancestors(a, by_id)}
+    b_chain = {s.span_id for s in _ancestors(b, by_id)}
+    shared = a_chain & b_chain
+    for node in by_id.values():
+        if node.span_id in shared and (
+            _kind(node) in {"session", "server"} or "mcp." in node.name
+        ):
+            return True
+    return False
+
+
+def _dedup_mcp_twins(
+    candidates: list[OtelSpan],
+    by_id: dict[str, OtelSpan],
+) -> list[OtelSpan]:
+    """Pass 1: collapse MCP client<->server twins to the server span."""
+    by_role: dict[str, list[OtelSpan]] = {"mcp_server": [], "mcp_client": [], "other": []}
+    for span in candidates:
+        by_role[_mcp_role(span, by_id)].append(span)
+
+    used: set[str] = set()
+    kept: list[OtelSpan] = []
+    for client in sorted(by_role["mcp_client"], key=sort_key):
+        if client.span_id in used:
+            continue
+        for server in sorted(by_role["mcp_server"], key=sort_key):
+            if server.span_id in used:
+                continue
+            if extract_tool_name(client) != extract_tool_name(server):
+                continue
+            if (
+                _is_ancestor(client, server, by_id)
+                or _is_ancestor(server, client, by_id)
+                or _shared_mcp_context(client, server, by_id)
+            ):
+                used.add(client.span_id)
+                used.add(server.span_id)
+                kept.append(server)
+                break
+
+    # Sequence match remaining unpaired same-name client/server pairs.
+    remaining_clients = [
+        s for s in sorted(by_role["mcp_client"], key=sort_key) if s.span_id not in used
+    ]
+    remaining_servers = [
+        s for s in sorted(by_role["mcp_server"], key=sort_key) if s.span_id not in used
+    ]
+    ci = 0
+    si = 0
+    while ci < len(remaining_clients) and si < len(remaining_servers):
+        client, server = remaining_clients[ci], remaining_servers[si]
+        if extract_tool_name(client) == extract_tool_name(server):
+            used.update({client.span_id, server.span_id})
+            kept.append(server)
+            ci += 1
+            si += 1
+        else:
+            ci += 1
+
+    for span in candidates:
+        if span.span_id not in used:
+            kept.append(span)
+    return kept
+
+
+def _collapse_wrapper_leaf(
+    candidates: list[OtelSpan],
+    by_id: dict[str, OtelSpan],
+) -> list[OtelSpan]:
+    """Pass 2: collapse same-name ancestor/descendant tool spans.
+
+    Keeps ``mcp_server`` if present, else the innermost (deepest) span.
+    Same-name *siblings* (retries / parallel calls) are never collapsed.
+    """
+    kept: list[OtelSpan] = []
+    for span in sorted(candidates, key=sort_key):
+        matched: OtelSpan | None = None
+        for other in kept:
+            if extract_tool_name(other) != extract_tool_name(span):
+                continue
+            if _is_ancestor(other, span, by_id) or _is_ancestor(span, other, by_id):
+                matched = other
+                break
+        if matched is None:
+            kept.append(span)
+            continue
+
+        server = [s for s in (matched, span) if _mcp_role(s, by_id) == "mcp_server"]
+        inner = max((matched, span), key=lambda s: _depth(s, by_id))
+        preferred = server[0] if server else inner
+        if preferred.span_id == span.span_id:
+            kept[kept.index(matched)] = span
+    return kept
+
+
+def sort_key(span: OtelSpan) -> tuple[int, str]:
+    """Deterministic ordering: (start_time_unix_nano, span_id)."""
+    return span.start_time_unix_nano, span.span_id
+
+
+def dedupe_tool_spans(
+    candidates: list[OtelSpan],
+    by_id: dict[str, OtelSpan],
+) -> list[OtelSpan]:
+    """Pass 1 (MCP twins) then pass 2 (wrapper + MCP leaf), then sort."""
+    if len(candidates) <= 1:
+        return candidates
+    after_twins = _dedup_mcp_twins(candidates, by_id)
+    after_wrappers = _collapse_wrapper_leaf(after_twins, by_id)
+    return sorted(after_wrappers, key=sort_key)
