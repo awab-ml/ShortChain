@@ -177,6 +177,22 @@ class EvaluationConfig(BaseModel):
 
 
 
+class RuntimeConfig(BaseModel):
+    """OTLP HTTP receiver / trace assembler settings (PR 4)."""
+
+    bind: str = "127.0.0.1:4318"
+    output: str = "data/runtime/trajectories.jsonl"
+    idle_timeout_s: float = 30.0
+    settle_timeout_s: float = 2.0
+    max_trace_age_s: float = 300.0
+    max_inflight_traces: int = 512
+    max_spans_in: int = 500
+    max_body_bytes: int = 16_777_216
+    workers: int = 1
+    require_success_true: bool = True   # ingest-level gate (success_only)
+    projection: ProjectionConfig = Field(default_factory=ProjectionConfig)
+
+
 # ---------------------------------------------------------------------------
 # Root config
 # ---------------------------------------------------------------------------
@@ -192,6 +208,7 @@ class ShortChainConfig(BaseModel):
     classifier: ClassifierConfig = Field(default_factory=ClassifierConfig)
     inference: InferenceConfig = Field(default_factory=InferenceConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
+    runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
 
 
 # ---------------------------------------------------------------------------
