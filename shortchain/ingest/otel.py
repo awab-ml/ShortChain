@@ -17,12 +17,14 @@ Attribute handling notes:
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from shortchain.config import ProjectionConfig
 from shortchain.ingest.schema import Span, Trajectory
+from shortchain.utils.logging import get_logger
 
 
 class OtelSpan(BaseModel):
@@ -1270,3 +1272,64 @@ def _first_service_name(trace: OtelTrace) -> str:
         if value:
             return str(value)
     return ""
+
+
+# ---------------------------------------------------------------------------
+# Offline loader (fixtures / reprocessing / file:// dumps)
+# ---------------------------------------------------------------------------
+
+
+def _read_otel_traces(path: Path) -> list[OtelTrace]:
+    """Parse an assembled-trace file: one trace, a list, or JSONL of traces."""
+    if path.suffix.lower() == ".jsonl":
+        return [OtelTrace.model_validate(line) for line in _iter_jsonl(path)]
+    data = json.loads(Path.read_text(path))
+    if isinstance(data, list):
+        return [OtelTrace.model_validate(item) for item in data]
+    return [OtelTrace.model_validate(data)]
+
+
+def _iter_jsonl(path: Path):
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            yield json.loads(line)
+
+
+class OtelTrajectoryLoader:
+    """Offline: load a file/dir of assembled OTEL traces and project them.
+
+    Implements the ``TrajectoryLoader`` protocol (``shortchain/ingest/base.py``)
+    so projection is testable without HTTP and reusable for reprocessing
+    ``file://`` dumps. Drops follow ``ProjectionConfig`` quality flags.
+    """
+
+    def __init__(self, config: ProjectionConfig | None = None) -> None:
+        self.config = config or ProjectionConfig()
+        self.projector = OtelTraceProjector(self.config)
+
+    def load(self, path: str | Path) -> list[Trajectory]:
+        """Load *path* (file or directory) and project every trace."""
+        path = Path(path)
+        if path.is_dir():
+            files = sorted(path.rglob("*.json")) + sorted(path.rglob("*.jsonl"))
+            traces: list[OtelTrace] = []
+            for fp in files:
+                traces.extend(_read_otel_traces(fp))
+        else:
+            traces = _read_otel_traces(path)
+
+        log = get_logger(__name__)
+        kept: list[Trajectory] = []
+        for trace in traces:
+            result = self.projector.project(trace)
+            if result.trajectory is not None:
+                kept.append(result.trajectory)
+            else:
+                log.warning(
+                    f"Drop trace {trace.trace_id}: {result.drop_reason}"
+                    f" (stats={result.stats})"
+                )
+        return kept

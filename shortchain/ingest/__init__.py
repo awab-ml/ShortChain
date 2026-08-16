@@ -7,6 +7,7 @@ from shortchain.ingest.otel import (
     OtelSpan,
     OtelTrace,
     OtelTraceProjector,
+    OtelTrajectoryLoader,
     ProjectionResult,
 )
 
@@ -19,5 +20,6 @@ __all__ = [
     "OtelSpan",
     "OtelTrace",
     "OtelTraceProjector",
+    "OtelTrajectoryLoader",
     "ProjectionResult",
 ]
