@@ -38,6 +38,27 @@ class IngestConfig(BaseModel):
     field_map: FieldMapConfig = Field(default_factory=FieldMapConfig)
 
 
+class ProjectionConfig(BaseModel):
+    """OTEL/OpenLLMetry → Trajectory projection settings.
+
+    Single source of truth: imported by ``shortchain/ingest/otel.py``,
+    ``shortchain/ingest/quality.py``, and ``RuntimeConfig``. Do not redeclare
+    it in those modules.
+    """
+
+    intent_strategy: str = "first_user"      # first_user | last_user_before_tools
+    accept_gen_ai_task_id: bool = False
+    accept_task_status: bool = False
+    success_tools: list[str] = Field(default_factory=list)
+    drop_tools: list[str] = Field(default_factory=list)
+    max_observation_chars: int = 2000
+    max_thought_chars: int = 2000
+    require_intent: bool = True
+    require_tool_spans: bool = True
+    require_known_success: bool = True       # matches success_only training
+    max_spans: int = 200                     # training-side cap after project
+
+
 class FeaturesConfig(BaseModel):
     """Feature pipeline settings."""
 
