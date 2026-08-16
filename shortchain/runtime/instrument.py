@@ -184,26 +184,31 @@ def attach_exporters(
     display_endpoint: str | None = None,
     disable_batch: bool = False,
     span_postprocess: Callable[[ReadableSpan], None] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> list[SpanExporter]:
     """Attach OTLP HTTP (and optional display) processors to *provider*.
 
     Returns the exporters attached (tests inspect them directly).
     ``file://path`` endpoints become local JSONL span dumps instead of HTTP.
     """
-    exporter = _build_exporter(endpoint, api_key)
+    exporter = _build_exporter(endpoint, api_key, headers)
     provider.add_span_processor(
         _make_processor(exporter, disable_batch, span_postprocess)
     )
     exporters = [exporter]
 
     if display_endpoint:
-        display = _build_exporter(display_endpoint, api_key)
+        display = _build_exporter(display_endpoint, api_key, headers)
         provider.add_span_processor(_make_processor(display, disable_batch, None))
         exporters.append(display)
     return exporters
 
 
-def _build_exporter(endpoint: str, api_key: str | None) -> SpanExporter:
+def _build_exporter(
+    endpoint: str,
+    api_key: str | None,
+    headers: dict[str, str] | None = None,
+) -> SpanExporter:
     if endpoint.startswith("file://"):
         return FileSpanExporter(endpoint[len("file://"):])
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
@@ -211,8 +216,10 @@ def _build_exporter(endpoint: str, api_key: str | None) -> SpanExporter:
     )
 
     url = endpoint if endpoint.endswith("/v1/traces") else f"{endpoint.rstrip('/')}/v1/traces"
-    headers = {"Authorization": f"Bearer {api_key}"} if api_key else None
-    return OTLPSpanExporter(endpoint=url, headers=headers)
+    merged_headers = dict(headers or {})
+    if api_key:
+        merged_headers.setdefault("Authorization", f"Bearer {api_key}")
+    return OTLPSpanExporter(endpoint=url, headers=merged_headers or None)
 
 
 def _make_processor(
