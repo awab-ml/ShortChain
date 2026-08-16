@@ -1,0 +1,19 @@
+# Runtime collection configuration — thin OTLP receiver (PR 4)
+# =============================================================
+#   python -m shortchain.runtime receive --config configs/runtime.yaml
+#
+# data/runtime/trajectories.jsonl is SECRET MATERIAL (prompts, tool args,
+# observations). It is created with mode 0o600 and must not be committed.
+
+runtime:
+  bind: "127.0.0.1:4318"
+  output: "data/runtime/trajectories.jsonl"
+  idle_timeout_s: 30
+  settle_timeout_s: 2
+  max_trace_age_s: 300
+  max_inflight_traces: 512
+  max_spans_in: 500
+  max_body_bytes: 16777216
+  workers: 1
+  require_success_true: true
+  projection: {}   # ProjectionConfig (single source of truth in config.py)
