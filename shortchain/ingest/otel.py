@@ -22,6 +22,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from shortchain.config import ProjectionConfig
+from shortchain.ingest.schema import Span, Trajectory
 
 
 class OtelSpan(BaseModel):
@@ -1047,3 +1048,225 @@ def extract_llm_tool_calls(trace: OtelTrace) -> list[tuple[str, str, str]]:
             observation = response_by_id.get(call_id, "")
             decisions.append((name, call["arguments"], observation))
     return decisions
+
+
+# ---------------------------------------------------------------------------
+# Projector
+# ---------------------------------------------------------------------------
+
+
+class ProjectionResult(BaseModel):
+    """Outcome of projecting one ``OtelTrace`` onto a ``Trajectory``."""
+
+    trajectory: Trajectory | None = None
+    drop_reason: str | None = None       # missing_intent | zero_tool_spans | ...
+    warnings: list[str] = Field(default_factory=list)
+    stats: dict[str, int] = Field(default_factory=dict)
+
+
+def _detect_framework(trace: OtelTrace) -> str:
+    """Best-effort source framework from span names / kinds."""
+    names = [s.name for s in trace.spans]
+    kinds = {_kind(s) for s in trace.spans}
+    joined = " ".join(names)
+    if "mcp.server" in joined or any(n.startswith("tools/call") for n in names):
+        if any(n.startswith("execute_tool ") for n in names) or "workflow" in joined:
+            return "mixed"
+        return "mcp"
+    if any(n.startswith("execute_tool ") for n in names):
+        return "langchain"
+    if any(n.endswith(".tool") for n in names) and any(".agent" in n for n in names):
+        return "openai_agents"
+    if any(".agent" in n for n in names):
+        return "crewai"
+    if any(n.startswith("function.") for n in names):
+        return "openinference"
+    if any(n.endswith(".tool") for n in names):
+        return "agno"
+    if "llm" in kinds or "workflow" in kinds:
+        return "unknown"
+    return "unknown"
+
+
+def _sum_attribute(trace: OtelTrace, key: str) -> int:
+    total = 0
+    for span in trace.spans:
+        value = _first_attr(span.attributes, key, key.replace("gen_ai.", "llm."))
+        if isinstance(value, (int, float)):
+            total += int(value)
+    return total
+
+
+class OtelTraceProjector:
+    """Project assembled OTEL traces onto ``Trajectory`` / ``Span``.
+
+    Server-side (receiver / offline loader); clients never run this. The
+    projector never emits a trajectory without ``success`` and
+    ``metadata.success_source`` even when the trace has none (K7).
+    """
+
+    def __init__(self, config: ProjectionConfig | None = None) -> None:
+        self.config = config or ProjectionConfig()
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def project(self, trace: OtelTrace) -> ProjectionResult:
+        """Project one trace; returns a kept ``Trajectory`` or a drop reason."""
+        stats = self._collect_stats(trace)
+        by_id = _span_by_id(trace)
+        root = _find_root(trace)
+
+        task_id = extract_task_id(trace, self.config, root)
+        intent, intent_source = extract_intent(trace, self.config, root)
+        if self.config.require_intent and not intent.strip():
+            return ProjectionResult(drop_reason="missing_intent", stats=stats)
+
+        success, success_source = resolve_success(trace, self.config, root)
+        if self.config.require_known_success and success_source == "unknown":
+            return ProjectionResult(drop_reason="success_unknown", stats=stats)
+
+        app_name = extract_app_name(trace, root)
+        spans, fallback = self._build_spans(trace, by_id, root)
+        if not spans and self.config.require_tool_spans:
+            return ProjectionResult(drop_reason="zero_tool_spans", stats=stats)
+
+        trajectory = Trajectory(
+            task_id=task_id,
+            intent=intent,
+            spans=spans,
+            success=success,
+            app_name=app_name,
+            metadata={
+                "source": "otel_openllmetry",
+                "otel.trace_id": trace.trace_id,
+                "otel.n_spans_in": stats.get("spans_in", 0),
+                "projection.framework": _detect_framework(trace),
+                "projection.fallback": "llm_tool_calls" if fallback else "none",
+                "success_source": success_source,
+                "intent_source": intent_source,
+                "tokens.input_sum": _sum_attribute(trace, "gen_ai.usage.input_tokens"),
+                "tokens.output_sum": _sum_attribute(trace, "gen_ai.usage.output_tokens"),
+                "tokens.total_sum": _sum_attribute(trace, "gen_ai.usage.total_tokens"),
+            },
+        )
+        conv_id = _first_conversation_id(trace)
+        if conv_id:
+            trajectory.metadata["gen_ai.conversation.id"] = conv_id
+        service = _first_service_name(trace)
+        if service:
+            trajectory.metadata["service.name"] = service
+        stats["n_spans_emitted"] = len(spans)
+        return ProjectionResult(trajectory=trajectory, stats=stats)
+
+    # ------------------------------------------------------------------
+    # Internals
+    # ------------------------------------------------------------------
+
+    def _collect_stats(self, trace: OtelTrace) -> dict[str, int]:
+        stats: dict[str, int] = {"spans_in": len(trace.spans)}
+        for span in trace.spans:
+            role = classify(span)
+            stats[f"n_{role}"] = stats.get(f"n_{role}", 0) + 1
+        return stats
+
+    def _build_spans(
+        self,
+        trace: OtelTrace,
+        by_id: dict[str, OtelSpan],
+        root: OtelSpan | None,
+    ) -> tuple[list[Span], bool]:
+        """Emit ShortChain spans: named tool spans, else LLM-call fallback."""
+        candidates = [
+            s for s in trace.spans
+            if classify(s) == "tool" and extract_tool_name(s) is not None
+        ]
+        if not candidates:
+            decisions = extract_llm_tool_calls(trace)
+            if not decisions:
+                return [], False
+            return self._spans_from_decisions(trace, by_id, root, decisions), True
+
+        candidates = [
+            s for s in candidates
+            if extract_tool_name(s) not in self.config.drop_tools
+        ]
+        deduped = dedupe_tool_spans(candidates, by_id)
+        spans: list[Span] = []
+        for otel_span in deduped:
+            name = extract_tool_name(otel_span)
+            if not name or name in self.config.drop_tools:
+                continue
+            spans.append(self._span_from_tool_span(trace, by_id, otel_span, name))
+        return spans, False
+
+    def _span_from_tool_span(
+        self,
+        trace: OtelTrace,
+        by_id: dict[str, OtelSpan],
+        otel_span: OtelSpan,
+        name: str,
+    ) -> Span:
+        return Span(
+            agent_name=nearest_agent_name(otel_span, by_id),
+            action=name,
+            observation=extract_tool_observation(
+                otel_span, self.config.max_observation_chars
+            ),
+            thoughts=extract_tool_thoughts(trace, otel_span, self.config.max_thought_chars),
+            metadata={
+                "otel.trace_id": otel_span.trace_id,
+                "otel.span_id": otel_span.span_id,
+                "otel.parent_span_id": otel_span.parent_span_id,
+                "otel.status_code": otel_span.status_code,
+                "gen_ai.operation.name": otel_span.attributes.get("gen_ai.operation.name"),
+                "traceloop.span.kind": otel_span.attributes.get("traceloop.span.kind"),
+                "tool_arguments": extract_tool_arguments(otel_span),
+                "projection.role": "tool",
+            },
+        )
+
+    def _spans_from_decisions(
+        self,
+        trace: OtelTrace,
+        by_id: dict[str, OtelSpan],
+        root: OtelSpan | None,
+        decisions: list[tuple[str, str, str]],
+    ) -> list[Span]:
+        agent_name = ""
+        if root is not None:
+            agent_name = nearest_agent_name(root, by_id)
+        spans: list[Span] = []
+        for name, arguments, observation in decisions:
+            if name in self.config.drop_tools:
+                continue
+            spans.append(
+                Span(
+                    agent_name=agent_name,
+                    action=name,
+                    observation=observation[: self.config.max_observation_chars],
+                    thoughts="",
+                    metadata={
+                        "tool_arguments": arguments,
+                        "projection.role": "llm_fallback",
+                    },
+                )
+            )
+        return spans
+
+
+def _first_conversation_id(trace: OtelTrace) -> str:
+    for span in sorted(trace.spans, key=lambda s: s.start_time_unix_nano):
+        value = _first_attr(span.attributes, "gen_ai.conversation.id")
+        if value:
+            return str(value)
+    return ""
+
+
+def _first_service_name(trace: OtelTrace) -> str:
+    for span in trace.spans:
+        value = _first_attr(span.resource, "service.name")
+        if value:
+            return str(value)
+    return ""
