@@ -117,3 +117,100 @@ def _parse_optional_bool(raw: Any) -> bool | None:
         if s in ("false", "0", "no"):
             return False
     return None  # unparseable → absent (do not guess)
+
+
+# ---------------------------------------------------------------------------
+# Span classification
+# ---------------------------------------------------------------------------
+
+# OpenLLMetry operation names / span kinds. A span is assigned exactly one
+# role; ``SKIP_OPS`` is checked FIRST so retriever/embedding spans (which
+# LangChain marks ``traceloop.span.kind=task``) never become task rows.
+
+TOOL_OPS = {"execute_tool"}
+LLM_OPS = {"chat", "text_completion", "completion", "llm_request"}
+SKIP_OPS = {"embeddings", "vector_db_retrieve", "handoff"}
+SKIP_NAMES = {"mcp_tools", "tools/list", "shortchain.task"}
+
+
+def _kind(span: OtelSpan) -> str:
+    """Lower-cased span kind (traceloop.span.kind, else openinference)."""
+    kind = _first_attr(
+        span.attributes,
+        "traceloop.span.kind",
+        "openinference.span.kind",
+    )
+    return str(kind or "").lower()
+
+
+def classify(span: OtelSpan) -> str:
+    """Assign exactly one role: root|tool|llm|agent|task|skip|other."""
+    attrs = span.attributes
+    op = _first_attr(attrs, "gen_ai.operation.name", "llm.request.type")
+    kind_l = _kind(span)
+
+    if op in SKIP_OPS or kind_l in {"session", "handoff", "server"}:
+        return "skip"
+    if span.name in SKIP_NAMES or _first_attr(attrs, "shortchain.task_root"):
+        if span.name == "shortchain.task" or _first_attr(attrs, "shortchain.task_root"):
+            return "root"
+        return "skip"
+    if op in TOOL_OPS:
+        return "tool"
+    if _first_attr(attrs, "gen_ai.tool.name", "tool.name"):
+        return "tool"
+    if span.name.startswith("execute_tool ") or span.name.endswith(".tool"):
+        return "tool"
+    if span.name.startswith("function.") and kind_l in {"tool", ""}:
+        return "tool"  # OpenInference / data/traces.jsonl
+    if kind_l == "tool":
+        return "tool"  # name still required at emit time
+    if op in LLM_OPS or kind_l == "llm":
+        return "llm"
+    if kind_l in {"workflow", "agent"} or op == "invoke_agent":
+        return "agent"
+    if kind_l == "task" or op == "execute_task":
+        return "task"
+    return "other"
+
+
+def _parse_span_name(name: str) -> str:
+    """Extract a bare tool name from an instrumented span name (or "")."""
+    if name.startswith("execute_tool "):
+        return name[len("execute_tool "):].strip()
+    if name == "tools/call.tool":
+        return ""  # MCP client span: name lives in entity.input.tool_name
+    if name.endswith(".tool"):
+        return name[: -len(".tool")].strip()
+    if name.startswith("function."):
+        return name[len("function."):].strip()
+    return ""
+
+
+def extract_tool_name(span: OtelSpan) -> str | None:
+    """Bare tool name for *span*, or ``None`` when it must not be emitted.
+
+    Called only after ``classify`` returned ``"tool"``. Returns ``None`` for
+    catalog listings / malformed spans (e.g. nameless ``kind=TOOL``
+    ``mcp_tools`` rows) — those must never become ShortChain ``Span`` rows.
+    """
+    attrs = span.attributes
+    name = _first_attr(attrs, "gen_ai.tool.name", "tool.name")
+    if name is not None and not isinstance(name, str):
+        name = None
+    if not name and _kind(span) == "tool":
+        name = _first_attr(attrs, "traceloop.entity.name")
+        if name is not None and not isinstance(name, str):
+            name = None
+    if not name and span.name == "tools/call.tool":
+        name = _first_attr(attrs, "traceloop.entity.input.tool_name")
+
+    if not name:
+        name = _parse_span_name(span.name)
+    if not name:
+        return None
+
+    name = str(name).split("(")[0].strip()
+    if not name or name in SKIP_NAMES:
+        return None
+    return name
