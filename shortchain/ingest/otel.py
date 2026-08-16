@@ -884,3 +884,166 @@ def dedupe_tool_spans(
     after_twins = _dedup_mcp_twins(candidates, by_id)
     after_wrappers = _collapse_wrapper_leaf(after_twins, by_id)
     return sorted(after_wrappers, key=sort_key)
+
+
+# ---------------------------------------------------------------------------
+# CrewAI / raw-OpenAI fallback (LLM message walk)
+# ---------------------------------------------------------------------------
+#
+# CrewAI's ``wrap_llm_call`` is the only tool-call carrier: prior tool_calls
+# are re-encoded on every later LLM *input*, so walking every LLM span would
+# re-emit every historical call on every subsequent turn (the duplication
+# bug). Contract: prefer the LATEST LLM span's input messages as the
+# conversation snapshot; emit each ``tool_call.id`` once, first-seen.
+#
+# Each returned decision is ``(name, arguments, observation)`` in order.
+
+
+def _message_tool_calls(msg: Any) -> list[dict[str, Any]]:
+    """Tool calls carried by one message (parts[] or legacy tool_calls[])."""
+    calls: list[dict[str, Any]] = []
+    if not isinstance(msg, dict):
+        return calls
+    parts = msg.get("parts")
+    if isinstance(parts, list):
+        for part in parts:
+            if not isinstance(part, dict):
+                continue
+            if part.get("type") not in ("tool_call", "function_call"):
+                continue
+            calls.append(
+                {
+                    "id": str(part.get("id") or ""),
+                    "name": str(part.get("name") or ""),
+                    "arguments": str(part.get("arguments") or ""),
+                }
+            )
+    for raw in _as_list(msg.get("tool_calls")):
+        if not isinstance(raw, dict):
+            continue
+        function = raw.get("function")
+        if isinstance(function, dict):
+            calls.append(
+                {
+                    "id": str(raw.get("id") or ""),
+                    "name": str(function.get("name") or ""),
+                    "arguments": str(function.get("arguments") or ""),
+                }
+            )
+        else:
+            calls.append(
+                {
+                    "id": str(raw.get("id") or ""),
+                    "name": str(raw.get("name") or ""),
+                    "arguments": str(raw.get("arguments") or ""),
+                }
+            )
+    return calls
+
+
+def _pair_tool_response(msg: Any) -> tuple[str, str] | None:
+    """(tool_call_id, content) for tool / function role messages."""
+    if not isinstance(msg, dict):
+        return None
+    if _message_role(msg) not in {"tool", "function"}:
+        return None
+    call_id = str(msg.get("tool_call_id") or msg.get("id") or "")
+    if not call_id:
+        return None
+    return call_id, _message_text(msg)
+
+
+def _canonical_args(arguments: str) -> str:
+    """Canonical form for missing-id dedup keys (stable across JSON dumps)."""
+    try:
+        return json.dumps(json.loads(arguments), sort_keys=True, ensure_ascii=False)
+    except (json.JSONDecodeError, TypeError):
+        return arguments
+
+
+def _merge_latest_output_calls(
+    snapshot: list[Any],
+    latest: OtelSpan,
+) -> list[Any]:
+    """Append tool calls seen only on the latest span's output messages."""
+    output = _first_attr(
+        latest.attributes,
+        "gen_ai.output.messages",
+        "llm.output_messages",
+    )
+    if not output:
+        return snapshot
+    known_ids = {
+        c["id"]
+        for msg in snapshot
+        for c in _message_tool_calls(msg)
+        if c["id"]
+    }
+    merged = list(snapshot)
+    for msg in _as_list(output):
+        for call in _message_tool_calls(msg):
+            if call["id"] and call["id"] not in known_ids:
+                known_ids.add(call["id"])
+                merged.append(
+                    {
+                        "role": "assistant",
+                        "parts": [
+                            {
+                                "type": "tool_call",
+                                "id": call["id"],
+                                "name": call["name"],
+                                "arguments": call["arguments"],
+                            }
+                        ],
+                    }
+                )
+    return merged
+
+
+def extract_llm_tool_calls(trace: OtelTrace) -> list[tuple[str, str, str]]:
+    """LLM-message-walk fallback for stacks with no named tool spans.
+
+    Returns ordered ``(name, arguments, observation)`` decisions. Each
+    ``tool_call.id`` is emitted once, first-seen; missing ids key on
+    ``(name, canonical arguments, first-seen ordinal)``. Unpaired calls get
+    ``observation=""``.
+    """
+    llm_spans = sorted(
+        (s for s in trace.spans if classify(s) == "llm"),
+        key=lambda s: s.start_time_unix_nano,
+    )
+    if not llm_spans:
+        return []
+    latest = llm_spans[-1]
+    snapshot = _merge_latest_output_calls(_llm_messages(latest), latest)
+
+    response_by_id: dict[str, str] = {}
+    for msg in snapshot:
+        paired = _pair_tool_response(msg)
+        if paired is not None:
+            response_by_id.setdefault(paired[0], paired[1])
+
+    decisions: list[tuple[str, str, str]] = []
+    seen_ids: set[str] = set()
+    seen_keys: set[tuple[str, str, int]] = set()
+    for msg_index, msg in enumerate(snapshot):
+        for call in _message_tool_calls(msg):
+            name = call["name"].split("(")[0].strip()
+            if not name:
+                continue
+            call_id = call["id"]
+            if call_id:
+                if call_id in seen_ids:
+                    continue
+                seen_ids.add(call_id)
+            else:
+                # Missing id: key on (name, canonical args, message position).
+                # The same call duplicated within one message collapses; the
+                # same call re-emitted on a later message does not.
+                key = (name, _canonical_args(call["arguments"]), msg_index)
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+            observation = response_by_id.get(call_id, "")
+            decisions.append((name, call["arguments"], observation))
+    return decisions
