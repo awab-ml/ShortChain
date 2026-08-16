@@ -1,0 +1,63 @@
+{
+  "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+  "spans": [
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "00000000000000000000000000000000",
+      "parent_span_id": null,
+      "name": "shortchain.task",
+      "start_time_unix_nano": 1000,
+      "end_time_unix_nano": 5000,
+      "status_code": "UNSET",
+      "attributes": {
+        "shortchain.task_root": true,
+        "traceloop.span.kind": "workflow",
+        "shortchain.task_id": "ticket-1842",
+        "shortchain.intent": "Find unpaid invoices",
+        "shortchain.success": true,
+        "traceloop.association.properties": {
+          "task_id": "ticket-1842",
+          "intent": "Find unpaid invoices",
+          "success": true,
+          "app_name": "support-agent"
+        },
+        "shortchain.complete": true
+      },
+      "resource": {
+        "service.name": "support-agent"
+      },
+      "events": []
+    },
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "llm1",
+      "parent_span_id": "root",
+      "name": "chat",
+      "start_time_unix_nano": 2000,
+      "end_time_unix_nano": 2500,
+      "status_code": "UNSET",
+      "attributes": {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.input.messages": "[{\"role\": \"user\", \"content\": \"Find unpaid invoices\"}, {\"role\": \"assistant\", \"parts\": [{\"id\": \"call_1\", \"type\": \"tool_call\", \"name\": \"search_emails\", \"arguments\": \"{\\\"q\\\": \\\"invoices\\\"}\"}]}]"
+      },
+      "resource": {},
+      "events": []
+    },
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "llm2",
+      "parent_span_id": "root",
+      "name": "chat",
+      "start_time_unix_nano": 3000,
+      "end_time_unix_nano": 3500,
+      "status_code": "UNSET",
+      "attributes": {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.input.messages": "[{\"role\": \"user\", \"content\": \"Find unpaid invoices\"}, {\"role\": \"assistant\", \"parts\": [{\"id\": \"call_1\", \"type\": \"tool_call\", \"name\": \"search_emails\", \"arguments\": \"{\\\"q\\\": \\\"invoices\\\"}\"}]}, {\"role\": \"tool\", \"tool_call_id\": \"call_1\", \"content\": \"3 unpaid invoices\"}]"
+      },
+      "resource": {},
+      "events": []
+    }
+  ],
+  "complete_reason": "explicit"
+}
