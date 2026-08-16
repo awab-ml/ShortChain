@@ -38,6 +38,11 @@ python scripts/evaluate.py \
     --dataset data/datasets/test.csv
 ```
 
+For **production** collection (live OTEL traces, not hand-written JSONL), see
+the SDK path in the [Integration Guide](integration.md) — one-line
+`ShortChain.init(...)`, a receiver process, then the same three commands on
+`data/runtime/trajectories.jsonl` (optionally with `--catalog`).
+
 ## What Just Happened?
 
 ### Span 1: Build Dataset
@@ -162,7 +167,16 @@ python scripts/build_dataset.py \
 
 ### Providing a Tool Catalog
 
-By default, ShortChain derives the tool catalog from the trajectories (every tool name that appears becomes a catalog entry). For better negative sampling and features, provide explicit tool descriptions:
+By default, ShortChain derives the tool catalog from the trajectories (every tool name that appears becomes a catalog entry). For better negative sampling and features, provide explicit tool descriptions — either via the CLI flag (the runtime writes this file for you):
+
+```bash
+python scripts/build_dataset.py \
+    --trajectories data/runtime/trajectories.jsonl \
+    --catalog data/runtime/catalog.json \
+    --output data/datasets/runtime
+```
+
+…or programmatically:
 
 ```python
 from shortchain.dataset.builder import DatasetBuilder

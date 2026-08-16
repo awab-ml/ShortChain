@@ -1,0 +1,94 @@
+{
+  "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+  "spans": [
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "00000000000000000000000000000000",
+      "parent_span_id": null,
+      "name": "shortchain.task",
+      "start_time_unix_nano": 1000,
+      "end_time_unix_nano": 5000,
+      "status_code": "UNSET",
+      "attributes": {
+        "shortchain.task_root": true,
+        "traceloop.span.kind": "workflow",
+        "shortchain.task_id": "ticket-1842",
+        "shortchain.intent": "Refund order 9921",
+        "shortchain.success": true,
+        "traceloop.association.properties": {
+          "task_id": "ticket-1842",
+          "intent": "Refund order 9921",
+          "success": true,
+          "app_name": "support-agent"
+        },
+        "shortchain.complete": true
+      },
+      "resource": {
+        "service.name": "support-agent"
+      },
+      "events": []
+    },
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "00000000000000000000000000000001",
+      "parent_span_id": "00000000000000000000000000000000",
+      "name": "mcp_tools",
+      "start_time_unix_nano": 2000,
+      "end_time_unix_nano": 2300,
+      "status_code": "UNSET",
+      "attributes": {
+        "openinference.span.kind": "TOOL"
+      },
+      "resource": {},
+      "events": []
+    },
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "00000000000000000000000000000002",
+      "parent_span_id": "00000000000000000000000000000000",
+      "name": "mcp_tools",
+      "start_time_unix_nano": 2400,
+      "end_time_unix_nano": 2700,
+      "status_code": "UNSET",
+      "attributes": {
+        "openinference.span.kind": "TOOL"
+      },
+      "resource": {},
+      "events": []
+    },
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "00000000000000000000000000000003",
+      "parent_span_id": "00000000000000000000000000000000",
+      "name": "generation.gemini-3-flash",
+      "start_time_unix_nano": 2800,
+      "end_time_unix_nano": 3100,
+      "status_code": "UNSET",
+      "attributes": {
+        "openinference.span.kind": "LLM",
+        "llm.input_messages": "[{\"role\": \"user\", \"content\": \"Check order\"}]",
+        "mcp.tools.listed": "[\"lookup_order\", \"refund_order\"]"
+      },
+      "resource": {},
+      "events": []
+    },
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "00000000000000000000000000000004",
+      "parent_span_id": "00000000000000000000000000000000",
+      "name": "function.refund_order",
+      "start_time_unix_nano": 3200,
+      "end_time_unix_nano": 3800,
+      "status_code": "UNSET",
+      "attributes": {
+        "openinference.span.kind": "TOOL",
+        "tool.name": "refund_order",
+        "input.value": "{\"order_id\": 9921}",
+        "output.value": "{\"refunded\": true}"
+      },
+      "resource": {},
+      "events": []
+    }
+  ],
+  "complete_reason": "explicit"
+}

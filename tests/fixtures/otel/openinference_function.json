@@ -1,0 +1,65 @@
+{
+  "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+  "spans": [
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "00000000000000000000000000000000",
+      "parent_span_id": null,
+      "name": "shortchain.task",
+      "start_time_unix_nano": 1000,
+      "end_time_unix_nano": 5000,
+      "status_code": "UNSET",
+      "attributes": {
+        "shortchain.task_root": true,
+        "traceloop.span.kind": "workflow",
+        "shortchain.task_id": "ticket-1842",
+        "shortchain.intent": "Check delivery status",
+        "shortchain.success": true,
+        "traceloop.association.properties": {
+          "task_id": "ticket-1842",
+          "intent": "Check delivery status",
+          "success": true,
+          "app_name": "support-agent"
+        },
+        "shortchain.complete": true
+      },
+      "resource": {
+        "service.name": "support-agent"
+      },
+      "events": []
+    },
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "00000000000000000000000000000001",
+      "parent_span_id": "00000000000000000000000000000000",
+      "name": "generation.gemini-3-flash-preview",
+      "start_time_unix_nano": 2000,
+      "end_time_unix_nano": 2500,
+      "status_code": "UNSET",
+      "attributes": {
+        "openinference.span.kind": "LLM",
+        "llm.input_messages": "[{\"role\": \"user\", \"content\": \"Check delivery status\"}]"
+      },
+      "resource": {},
+      "events": []
+    },
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "00000000000000000000000000000002",
+      "parent_span_id": "00000000000000000000000000000000",
+      "name": "function.check_status",
+      "start_time_unix_nano": 3000,
+      "end_time_unix_nano": 3600,
+      "status_code": "UNSET",
+      "attributes": {
+        "openinference.span.kind": "TOOL",
+        "tool.name": "check_status",
+        "input.value": "{\"order_id\": 9921}",
+        "output.value": "{\"status\": \"shipped\"}"
+      },
+      "resource": {},
+      "events": []
+    }
+  ],
+  "complete_reason": "explicit"
+}

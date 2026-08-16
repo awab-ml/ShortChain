@@ -1,0 +1,123 @@
+{
+  "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+  "spans": [
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "00000000000000000000000000000000",
+      "parent_span_id": null,
+      "name": "shortchain.task",
+      "start_time_unix_nano": 1000,
+      "end_time_unix_nano": 5000,
+      "status_code": "UNSET",
+      "attributes": {
+        "shortchain.task_root": true,
+        "traceloop.span.kind": "workflow",
+        "shortchain.task_id": "ticket-1842",
+        "shortchain.intent": "Add two numbers",
+        "shortchain.success": true,
+        "traceloop.association.properties": {
+          "task_id": "ticket-1842",
+          "intent": "Add two numbers",
+          "success": true,
+          "app_name": "support-agent"
+        },
+        "shortchain.complete": true
+      },
+      "resource": {
+        "service.name": "support-agent"
+      },
+      "events": []
+    },
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "00000000000000000000000000000001",
+      "parent_span_id": "00000000000000000000000000000000",
+      "name": "workflow",
+      "start_time_unix_nano": 2000,
+      "end_time_unix_nano": 5000,
+      "status_code": "UNSET",
+      "attributes": {
+        "traceloop.span.kind": "workflow"
+      },
+      "resource": {},
+      "events": []
+    },
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "00000000000000000000000000000002",
+      "parent_span_id": "00000000000000000000000000000001",
+      "name": "execute_tool add_numbers",
+      "start_time_unix_nano": 3000,
+      "end_time_unix_nano": 4500,
+      "status_code": "UNSET",
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "traceloop.span.kind": "tool",
+        "gen_ai.tool.name": "add_numbers",
+        "gen_ai.tool.call.arguments": "{\"a\": 1, \"b\": 2}"
+      },
+      "resource": {},
+      "events": []
+    },
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "00000000000000000000000000000003",
+      "parent_span_id": "00000000000000000000000000000002",
+      "name": "mcp.client.session",
+      "start_time_unix_nano": 3100,
+      "end_time_unix_nano": 4400,
+      "status_code": "UNSET",
+      "attributes": {
+        "traceloop.span.kind": "session"
+      },
+      "resource": {},
+      "events": []
+    },
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "00000000000000000000000000000004",
+      "parent_span_id": "00000000000000000000000000000003",
+      "name": "tools/call.tool",
+      "start_time_unix_nano": 3200,
+      "end_time_unix_nano": 3500,
+      "status_code": "UNSET",
+      "attributes": {
+        "traceloop.span.kind": "tool",
+        "traceloop.entity.input": "{\"tool_name\": \"add_numbers\", \"arguments\": {\"a\": 1, \"b\": 2}}"
+      },
+      "resource": {},
+      "events": []
+    },
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "00000000000000000000000000000005",
+      "parent_span_id": "00000000000000000000000000000002",
+      "name": "mcp.server",
+      "start_time_unix_nano": 3100,
+      "end_time_unix_nano": 4400,
+      "status_code": "UNSET",
+      "attributes": {
+        "traceloop.span.kind": "server"
+      },
+      "resource": {},
+      "events": []
+    },
+    {
+      "trace_id": "1284243cbddd4e94a9fae290ec776f40",
+      "span_id": "00000000000000000000000000000006",
+      "parent_span_id": "00000000000000000000000000000005",
+      "name": "add_numbers.tool",
+      "start_time_unix_nano": 3400,
+      "end_time_unix_nano": 3700,
+      "status_code": "UNSET",
+      "attributes": {
+        "traceloop.span.kind": "tool",
+        "traceloop.entity.name": "add_numbers",
+        "traceloop.entity.output": "{\"result\": 3}"
+      },
+      "resource": {},
+      "events": []
+    }
+  ],
+  "complete_reason": "explicit"
+}

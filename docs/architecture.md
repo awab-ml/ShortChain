@@ -86,6 +86,8 @@ ShortChain is organized into six modules that form a linear pipeline:
 ### Ingest (`shortchain/ingest/`)
 
 **Purpose**: Normalize any agent log format into typed `Trajectory` objects.
+This is the **source-adapter layer**: offline loaders (JSONL, OTEL dumps,
+HALO/AppWorld) and the production runtime both land here.
 
 ```
 schema.py
@@ -101,12 +103,55 @@ loader.py
 └── JSONLTrajectoryLoader
     ├── .load(path)        — Load from file or directory
     └── FieldMapConfig     — Maps your field names to ShortChain's
+
+otel.py
+└── OtelTraceProjector    — OTEL/OpenLLMetry spans → Trajectory
+    └── OtelTrajectoryLoader — Offline: file/dir of assembled OTEL traces
+
+quality.py
+└── TrajectoryQualityGate — Drop reasons (missing_intent, success_unknown, …)
 ```
 
 **Design decisions:**
 - `FieldMapConfig` means zero code changes to ingest new log formats — just update YAML
 - `Span.tool_name` handles both `"send_email"` and `"send_email(to='x', subject='...')"` formats
 - `tools_used` is auto-derived via `@model_validator` — no manual extraction needed
+- **Production collection is the runtime module, not this file-based path** — the
+  runtime projects live OTLP traces onto `Trajectory` server-side (see below)
+
+---
+
+### Runtime (`shortchain/runtime/`)
+
+**Purpose**: Production collection — SDK instrumentation on the user side and
+a thin OTLP receiver + assembler on the training-data side.
+
+```
+sdk.py      — ShortChain.init / set_task / set_success / end_task
+instrument.py — Own TracerProvider + OpenLLMetry instrumentor enablement
+task_span.py  — SDK-owned `shortchain.task` root span carrying success (K13)
+association.py — merge-not-replace association injection onto child spans
+assembler.py — TraceAssembler: buffer by trace_id, completion rules, bounds
+receiver.py   — Starlette POST /v1/traces (protobuf + JSON + gzip)
+cli.py        — python -m shortchain.runtime receive (workers=1 enforced)
+catalog.py    — Tool-catalog extraction from OTEL traces
+```
+
+Flow:
+
+```
+User agent (SDK)                     ShortChain runtime
+OpenLLMetry spans ──OTLP HTTP──▶ POST /v1/traces
+                                   TraceAssembler (buffer by trace_id,
+                                   explicit/root+settle, idle, max_age)
+                                   OtelTraceProjector → Trajectory
+                                   TrajectoryQualityGate → drop reasons
+                                   data/runtime/trajectories.jsonl (0600)
+```
+
+Existing `scripts/build_dataset.py` / `scripts/train.py` consume
+`data/runtime/trajectories.jsonl` unchanged; `--catalog` adds the runtime's
+tool catalog (`data/runtime/catalog.json`) for description features.
 
 ---
 

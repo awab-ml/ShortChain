@@ -28,10 +28,36 @@ dependencies = [
 embeddings = [
     "sentence-transformers>=5.4.1",
 ]
+otel = [
+    "opentelemetry-api>=1.38.0,<2",
+    "opentelemetry-sdk>=1.38.0,<2",
+    "opentelemetry-exporter-otlp-proto-http>=1.38.0,<2",
+    "opentelemetry-proto>=1.38.0,<2",
+    "opentelemetry-semantic-conventions>=0.59b0",
+    "opentelemetry-semantic-conventions-ai>=0.5.1,<0.6.0",
+]
+receiver = [
+    "shortchain[otel]",
+    "starlette>=0.37",
+    "uvicorn>=0.27",
+]
+sdk = [
+    "shortchain[otel]",
+    "opentelemetry-instrumentation-threading>=0.59b0",
+    "opentelemetry-instrumentation-langchain>=0.62.0,<0.63",
+    "opentelemetry-instrumentation-openai>=0.62.0,<0.63",
+    "opentelemetry-instrumentation-openai-agents>=0.62.0,<0.63",
+    "opentelemetry-instrumentation-crewai>=0.62.0,<0.63",
+    "opentelemetry-instrumentation-agno>=0.62.0,<0.63",
+    "opentelemetry-instrumentation-mcp>=0.62.0,<0.63",
+    "opentelemetry-instrumentation-anthropic>=0.62.0,<0.63",
+    "opentelemetry-instrumentation-litellm>=0.62.0,<0.63",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "ruff>=0.1",
+    "httpx>=0.27",
 ]
 
 [tool.hatch.build.targets.wheel]
