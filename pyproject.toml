@@ -44,6 +44,14 @@ receiver = [
 sdk = [
     "shortchain[otel]",
     "opentelemetry-instrumentation-threading>=0.59b0",
+    "opentelemetry-instrumentation-langchain>=0.62.0,<0.63",
+    "opentelemetry-instrumentation-openai>=0.62.0,<0.63",
+    "opentelemetry-instrumentation-openai-agents>=0.62.0,<0.63",
+    "opentelemetry-instrumentation-crewai>=0.62.0,<0.63",
+    "opentelemetry-instrumentation-agno>=0.62.0,<0.63",
+    "opentelemetry-instrumentation-mcp>=0.62.0,<0.63",
+    "opentelemetry-instrumentation-anthropic>=0.62.0,<0.63",
+    "opentelemetry-instrumentation-litellm>=0.62.0,<0.63",
 ]
 dev = [
     "pytest>=7.0",
