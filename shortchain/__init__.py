@@ -19,4 +19,4 @@ The pipeline is agent-agnostic: it binds only to execution traces and typed
 tool schemas, so the same core serves many integrations (see ``integrations/``).
 """
 
-__version__ = "0.0.2"
+__version__ = "0.1.0"
