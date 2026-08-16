@@ -8,7 +8,7 @@ But this is a **ranking problem**, not a generation problem. Given a fixed catal
 
 ## The Solution
 
-**ShortChain** trains a lightweight tabular classifier (~1ms inference) on the agent's own successful execution traces. At runtime, it replaces or augments LLM calls with a single forward pass through the classifier, achieving:
+**ShortChain** trains a lightweight tabular classifier (~1ms inference) on the agent's own successful execution traces. Traces come from your agent's **live OpenTelemetry/OpenLLMetry instrumentation** (via the ShortChain SDK) or from offline JSONL / benchmark exports. At runtime, it replaces or augments LLM calls with a single forward pass through the classifier, achieving:
 
 - **~95% latency reduction**: ~1ms vs ~500–2000ms per decision
 - **~85–91% cost reduction**: no API calls for tool selection
@@ -19,7 +19,8 @@ But this is a **ranking problem**, not a generation problem. Given a fixed catal
 ```
 Phase 1: TRAINING (offline, one-time)
 ──────────────────────────────────────
-Agent execution logs → Trajectories → (context, tool, label) pairs → XGBoost classifier
+Agent logs → Projected Trajectories → (context, tool, label) pairs → XGBoost classifier
+   (OTEL via SDK + receiver, or JSONL dumps)
 
 Phase 2: INFERENCE (online, per-decision)
 ─────────────────────────────────────────
