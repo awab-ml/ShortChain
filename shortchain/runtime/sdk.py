@@ -24,6 +24,7 @@ from collections.abc import Callable
 
 from opentelemetry.sdk.trace import ReadableSpan
 
+from shortchain.runtime.association import AssociationInjectionSpanProcessor
 from shortchain.runtime.instrument import (
     attach_exporters,
     enable_instrumentors,
@@ -106,6 +107,8 @@ class ShortChain:
             app_name=app_name,
             resource_attributes=resource_attributes,
         )
+        # K13: association injected onto every future child span.
+        provider.add_span_processor(AssociationInjectionSpanProcessor())
         n_exporters = len(
             attach_exporters(
                 provider,
@@ -130,6 +133,63 @@ class ShortChain:
         )
         ShortChain._initialized = True
         atexit.register(ShortChain.flush)
+
+    # ------------------------------------------------------------------
+    # Task-root span (K13) — production training quality requires these
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def set_task(
+        task_id: str,
+        *,
+        intent: str | None = None,
+        app_name: str | None = None,
+        **association: str,
+    ) -> None:
+        """Start (or replace) the SDK task-root span and merge association.
+
+        All OpenLLMetry children started while this is current become
+        children of the root → same ``trace_id``. You must call
+        ``end_task`` / ``set_success`` to make the trace trainable.
+        """
+        from shortchain.runtime import task_span
+
+        task_span.open_task(
+            task_id,
+            intent=intent,
+            app_name=app_name,
+            **association,
+        )
+
+    @staticmethod
+    def set_success(success: bool) -> None:
+        """Write success on the open task root and end it.
+
+        Alias of ``end_task``. Must NOT start a new span — a post-run new
+        span would have a new ``trace_id`` and the assembler would drop
+        both fragments.
+        """
+        from shortchain.runtime import task_span
+
+        task_span.set_success(success)
+
+    @staticmethod
+    def end_task(success: bool | None = None) -> None:
+        """Write optional success + ``shortchain.complete`` and end the root.
+
+        ``success=None`` ends the root WITHOUT success: the trace projects
+        with ``success_source=unknown`` and the quality gate drops it.
+        """
+        from shortchain.runtime import task_span
+
+        task_span.end_task(success)
+
+    @staticmethod
+    def set_association(**properties: str) -> None:
+        """Merge-not-replace association into context + the current span."""
+        from shortchain.runtime import task_span
+
+        task_span.set_association(**properties)
 
     @staticmethod
     def flush() -> None:
