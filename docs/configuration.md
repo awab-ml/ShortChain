@@ -3,7 +3,7 @@
 ShortChain is fully configurable via YAML. All settings have sensible defaults in `configs/default.yaml`. Override any setting by creating a custom YAML file and passing it with `--config`:
 
 ```bash
-python scripts/train.py --dataset data/datasets/ --config my_config.yaml
+python -m shortchain train --dataset /tmp/sc-ds --config my_config.yaml
 ```
 
 Custom configs are **deep-merged** on top of defaults — you only specify what you want to change.

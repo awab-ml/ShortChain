@@ -68,10 +68,10 @@ traj.summary()      # {"task_id": "task_001", "intent": "Send an email...", ...}
 from shortchain.ingest.loader import load_trajectories
 
 # Load from directory (reads all .json/.jsonl files)
-trajs = load_trajectories("data/example/")
+trajs = load_trajectories("examples/traces/")
 
 # Load from single file
-trajs = load_trajectories("data/example/trajectories.jsonl")
+trajs = load_trajectories("examples/traces/trajectories.jsonl")
 
 # With custom config
 from shortchain.config import IngestConfig
