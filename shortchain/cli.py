@@ -7,24 +7,14 @@ Subcommands
 - ``train``     train a classifier from a dataset
 - ``evaluate``  evaluate a trained model on a test set
 
-Each subcommand is a thin wrapper over the same logic exposed by the
-``scripts/`` maintainer utilities, so the documented public interface is a
-single ``shortchain`` entry point.
+Every subcommand lives inside the installed package (``shortchain.commands``
+and ``shortchain.telemetry``), so the entry point works from a wheel with no
+dependency on the checkout's ``scripts/`` directory.
 """
 
 from __future__ import annotations
 
-import importlib.util
 import sys
-from pathlib import Path
-
-
-def _load_script(name: str):
-    root = Path(__file__).resolve().parent.parent
-    spec = importlib.util.spec_from_file_location(name, root / "scripts" / f"{name}.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def _print_help() -> None:
@@ -39,7 +29,7 @@ def _print_help() -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    argv = sys.argv[1:] if argv is None else argv
+    argv = list(sys.argv[1:] if argv is None else argv)
     if not argv:
         _print_help()
         return 0
@@ -51,10 +41,20 @@ def main(argv: list[str] | None = None) -> int:
         from shortchain.telemetry.cli import main as _receive
 
         _receive(rest)
-    elif sub in ("dataset", "train", "evaluate"):
-        # The script mains parse ``sys.argv[1:]``; drop the subcommand name.
-        sys.argv = ["shortchain", *rest]
-        _load_script("build_dataset" if sub == "dataset" else sub).main()
+    elif sub == "dataset":
+        from shortchain.commands.build_dataset import main as _dataset
+
+        _dataset(rest)
+    elif sub == "train":
+        from shortchain.commands.train import main as _train
+
+        _train(rest)
+    elif sub == "evaluate":
+        from shortchain.commands.evaluate import main as _evaluate
+
+        _evaluate(rest)
+    elif sub in ("-h", "--help", "help"):
+        _print_help()
     else:
         _print_help()
         return 2
