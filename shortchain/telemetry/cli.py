@@ -1,6 +1,6 @@
 """CLI for the ShortChain runtime (PR 4).
 
-    python -m shortchain.runtime receive [--config configs/runtime.yaml]
+    python -m shortchain.telemetry receive [--config configs/runtime.yaml]
 
 Starts the thin OTLP/HTTP receiver with the mandated ``--workers 1``
 (uvicorn multi-worker would split one trace_id across assemblers — each
@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 
 from shortchain.config import RuntimeConfig, load_config
-from shortchain.runtime.assembler import (
+from shortchain.telemetry.assembler import (
     JsonlTrajectoryWriter,
     RuntimeMetrics,
     TraceAssembler,
@@ -50,7 +50,7 @@ def _start_background_tick(assembler: TraceAssembler) -> threading.Thread:
 
 def _make_args_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="shortchain.runtime",
+        prog="shortchain.telemetry",
         description="ShortChain production collection runtime.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -121,7 +121,7 @@ def run_receive(args: argparse.Namespace) -> None:
     """Start the assembled receiver with uvicorn (workers=1)."""
     import uvicorn
 
-    from shortchain.runtime.receiver import create_receiver_app
+    from shortchain.telemetry.receiver import create_receiver_app
 
     config = _config_from_args(args)
     if args.out:

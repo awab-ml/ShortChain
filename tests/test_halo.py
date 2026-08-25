@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from shortchain.integrations.halo import (
+from shortchain.adapters.halo import (
     app_of,
     build_trajectory_from_rows,
     catalog_app_index,

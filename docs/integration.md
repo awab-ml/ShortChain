@@ -32,7 +32,7 @@ ShortChain supports three deployment modes, ranging from conservative to aggress
 ShortChain replaces the LLM entirely for tool selection. Use when you have high confidence in the classifier (well-trained model, tools are familiar).
 
 ```python
-from shortchain.head.inference import InferenceEngine
+from shortchain.model.inference import InferenceEngine
 
 # Load once at startup (~50ms)
 engine = InferenceEngine(model_path="models/shortchain.pkl", top_k=5)
@@ -58,7 +58,7 @@ def choose_tool(context: dict, tool_catalog: list[dict]) -> str:
 ShortChain narrows candidates from N tools to 5, then the LLM picks from the shortlist. The LLM processes 5 tool descriptions instead of 100+, reducing prompt size and cost.
 
 ```python
-from shortchain.head.inference import InferenceEngine
+from shortchain.model.inference import InferenceEngine
 
 engine = InferenceEngine(model_path="models/shortchain.pkl", top_k=5)
 
@@ -92,7 +92,7 @@ def choose_tool(context: dict, tool_catalog: list[dict], llm) -> str:
 Use ShortChain when it's confident, fall back to the LLM when it's not. Best balance of cost and accuracy.
 
 ```python
-from shortchain.head.inference import InferenceEngine
+from shortchain.model.inference import InferenceEngine
 
 engine = InferenceEngine(model_path="models/shortchain.pkl", top_k=5)
 
@@ -169,7 +169,7 @@ def handle_request(req):
 Run the receiver (workers are locked to 1; `data/runtime/*` is secret material):
 
 ```bash
-python -m shortchain.runtime receive --config configs/runtime.yaml
+python -m shortchain.telemetry receive --config configs/runtime.yaml
 ```
 
 Then train on the collected traces (the default field map already matches the
@@ -262,7 +262,7 @@ Check the metrics. Key thresholds:
 ### 6. Deploy
 
 ```python
-from shortchain.head.inference import InferenceEngine
+from shortchain.model.inference import InferenceEngine
 
 engine = InferenceEngine(model_path="models/my_agent.pkl")
 
@@ -281,8 +281,8 @@ from shortchain.config import load_config
 from shortchain.ingest.loader import load_trajectories
 from shortchain.dataset.builder import DatasetBuilder
 from shortchain.dataset.splitter import GroupStratifiedSplitter
-from shortchain.head.trainer import Trainer
-from shortchain.head.inference import InferenceEngine
+from shortchain.model.trainer import Trainer
+from shortchain.model.inference import InferenceEngine
 from shortchain.evaluation.metrics import compute_metrics
 
 # 1. Load config

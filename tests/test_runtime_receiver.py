@@ -18,12 +18,12 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 from starlette.testclient import TestClient
 
 from shortchain.config import ProjectionConfig, RuntimeConfig
-from shortchain.runtime.assembler import (
+from shortchain.telemetry.assembler import (
     JsonlTrajectoryWriter,
     RuntimeMetrics,
     TraceAssembler,
 )
-from shortchain.runtime.receiver import create_receiver_app
+from shortchain.telemetry.receiver import create_receiver_app
 from shortchain.utils.io import read_jsonl
 
 TID = "a" * 32

@@ -24,7 +24,7 @@ import pandas as pd
 
 from shortchain.config import load_config
 from shortchain.evaluation.metrics import compute_metrics, format_metrics
-from shortchain.head.classifier import ShortChainClassifier
+from shortchain.model.classifier import ShortChainClassifier
 from shortchain.utils.io import write_json
 from shortchain.utils.logging import get_logger
 

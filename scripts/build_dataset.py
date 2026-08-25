@@ -38,7 +38,7 @@ from shortchain.config import load_config
 from shortchain.dataset.builder import DatasetBuilder
 from shortchain.dataset.splitter import GroupStratifiedSplitter
 from shortchain.ingest.loader import load_trajectories
-from shortchain.runtime.catalog import load_catalog_file
+from shortchain.telemetry.catalog import load_catalog_file
 from shortchain.utils.io import ensure_dir
 from shortchain.utils.logging import get_logger
 

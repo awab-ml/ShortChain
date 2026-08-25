@@ -19,7 +19,7 @@ from typing import Any
 from opentelemetry import context, trace
 from opentelemetry.trace import Span, SpanKind, set_span_in_context
 
-from shortchain.runtime.association import (
+from shortchain.telemetry.association import (
     reset_association,
     set_association_values,
     write_association_on_span,

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 
-from shortchain.integrations.appworld_api import (
+from shortchain.adapters.appworld_api import (
     ParamSpec,
     build_catalog_and_schemas,
     load_appworld_api_spec,

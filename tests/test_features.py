@@ -396,7 +396,7 @@ class TestToolSchemaFeatures:
     must NOT appear when no specs are provided (backward compatibility)."""
 
     def _specs(self):
-        from shortchain.integrations.appworld_api import ToolSpec, ParamSpec
+        from shortchain.adapters.appworld_api import ToolSpec, ParamSpec
         return {
             "spotify__login": ToolSpec(
                 app_name="spotify", api_name="spotify__login",

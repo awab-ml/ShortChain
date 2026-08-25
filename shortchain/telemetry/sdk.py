@@ -1,7 +1,7 @@
 """ShortChain SDK — production collection entry point (PR 5).
 
 ``ShortChain.init`` sets up our own ``TracerProvider`` (see
-``shortchain/runtime/instrument.py``), enables installed OpenLLMetry
+``shortchain/telemetry/instrument.py``), enables installed OpenLLMetry
 instrumentations, and exports OTLP to the training receiver. The API is
 ours (K5): we never wrap ``Traceloop.init`` — no Traceloop branding, no
 default ``api.traceloop.com``, no hard dependency on every instrumentation.
@@ -24,8 +24,8 @@ from collections.abc import Callable
 
 from opentelemetry.sdk.trace import ReadableSpan
 
-from shortchain.runtime.association import AssociationInjectionSpanProcessor
-from shortchain.runtime.instrument import (
+from shortchain.telemetry.association import AssociationInjectionSpanProcessor
+from shortchain.telemetry.instrument import (
     attach_exporters,
     enable_instrumentors,
     setup_tracer_provider,
@@ -152,7 +152,7 @@ class ShortChain:
         children of the root → same ``trace_id``. You must call
         ``end_task`` / ``set_success`` to make the trace trainable.
         """
-        from shortchain.runtime import task_span
+        from shortchain.telemetry import task_span
 
         task_span.open_task(
             task_id,
@@ -169,7 +169,7 @@ class ShortChain:
         span would have a new ``trace_id`` and the assembler would drop
         both fragments.
         """
-        from shortchain.runtime import task_span
+        from shortchain.telemetry import task_span
 
         task_span.set_success(success)
 
@@ -180,14 +180,14 @@ class ShortChain:
         ``success=None`` ends the root WITHOUT success: the trace projects
         with ``success_source=unknown`` and the quality gate drops it.
         """
-        from shortchain.runtime import task_span
+        from shortchain.telemetry import task_span
 
         task_span.end_task(success)
 
     @staticmethod
     def set_association(**properties: str) -> None:
         """Merge-not-replace association into context + the current span."""
-        from shortchain.runtime import task_span
+        from shortchain.telemetry import task_span
 
         task_span.set_association(**properties)
 

@@ -8,8 +8,8 @@ pytest.importorskip("opentelemetry")
 
 from opentelemetry import trace
 
-from shortchain.runtime import task_span as ts
-from shortchain.runtime.association import association_values
+from shortchain.telemetry import task_span as ts
+from shortchain.telemetry.association import association_values
 
 ROOT = "shortchain.task"
 

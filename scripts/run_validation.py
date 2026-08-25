@@ -72,13 +72,13 @@ from shortchain.evaluation.statistics import (
     holm_bonferroni,
     paired_bootstrap_p_and_ci,
 )
-from shortchain.head.classifier import ShortChainClassifier
-from shortchain.integrations.halo import (
+from shortchain.model.classifier import ShortChainClassifier
+from shortchain.adapters.halo import (
     catalog_app_index,
     load_appworld_traces,
     reconstruct_catalog,
 )
-from shortchain.integrations.appworld_api import build_catalog_and_schemas
+from shortchain.adapters.appworld_api import build_catalog_and_schemas
 from shortchain.utils.logging import get_logger
 
 log = get_logger(__name__)

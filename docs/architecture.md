@@ -133,7 +133,7 @@ task_span.py  — SDK-owned `shortchain.task` root span carrying success (K13)
 association.py — merge-not-replace association injection onto child spans
 assembler.py — TraceAssembler: buffer by trace_id, completion rules, bounds
 receiver.py   — Starlette POST /v1/traces (protobuf + JSON + gzip)
-cli.py        — python -m shortchain.runtime receive (workers=1 enforced)
+cli.py        — python -m shortchain.telemetry receive (workers=1 enforced)
 catalog.py    — Tool-catalog extraction from OTEL traces
 ```
 

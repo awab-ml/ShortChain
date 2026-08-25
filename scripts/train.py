@@ -26,7 +26,7 @@ from pathlib import Path
 import pandas as pd
 
 from shortchain.config import load_config
-from shortchain.head.trainer import Trainer
+from shortchain.model.trainer import Trainer
 from shortchain.utils.io import ensure_dir, write_json
 from shortchain.utils.logging import get_logger
 

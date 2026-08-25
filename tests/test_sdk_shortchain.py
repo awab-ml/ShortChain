@@ -8,10 +8,10 @@ import pytest
 
 pytest.importorskip("opentelemetry.sdk.trace")
 
-import shortchain.runtime.sdk as sdk_mod
+import shortchain.telemetry.sdk as sdk_mod
 from shortchain.sdk import ShortChain
-from shortchain.runtime import instrument as inst
-from shortchain.runtime.sdk import _env_bool, _is_local_endpoint
+from shortchain.telemetry import instrument as inst
+from shortchain.telemetry.sdk import _env_bool, _is_local_endpoint
 
 
 class TestInitSignals:

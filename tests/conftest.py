@@ -22,8 +22,8 @@ try:
     )
     from opentelemetry.trace import set_tracer_provider
 
-    from shortchain.runtime.association import AssociationInjectionSpanProcessor
-    from shortchain.runtime import task_span
+    from shortchain.telemetry.association import AssociationInjectionSpanProcessor
+    from shortchain.telemetry import task_span
 
     _HAS_OTEL = True
 except ImportError:  # pragma: no cover - exercised on core-only installs

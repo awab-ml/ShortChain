@@ -17,7 +17,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
 )
 from opentelemetry.trace import ProxyTracerProvider
 
-from shortchain.runtime import instrument as inst
+from shortchain.telemetry import instrument as inst
 
 
 def make_provider() -> TracerProvider:

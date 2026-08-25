@@ -6,7 +6,7 @@ from pathlib import Path
 
 from shortchain.config import ProjectionConfig, RuntimeConfig
 from shortchain.ingest.otel import OtelSpan
-from shortchain.runtime.assembler import (
+from shortchain.telemetry.assembler import (
     JsonlTrajectoryWriter,
     RuntimeMetrics,
     TraceAssembler,

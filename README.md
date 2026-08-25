@@ -56,7 +56,7 @@ def handle_request(req):
 Run the receiver, then train on its output:
 
 ```bash
-python -m shortchain.runtime receive --config configs/runtime.yaml
+python -m shortchain.telemetry receive --config configs/runtime.yaml
 python scripts/build_dataset.py \
     --trajectories data/runtime/trajectories.jsonl \
     --catalog data/runtime/catalog.json \
@@ -67,7 +67,7 @@ python scripts/train.py --dataset data/datasets/runtime --output models/shortcha
 ## Use in Your Agent
 
 ```python
-from shortchain.head.inference import InferenceEngine
+from shortchain.model.inference import InferenceEngine
 
 engine = InferenceEngine(model_path="models/shortchain.pkl", top_k=5)
 

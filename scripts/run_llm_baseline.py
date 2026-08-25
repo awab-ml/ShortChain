@@ -26,8 +26,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import numpy as np
 import requests
 
-from shortchain.integrations.appworld_api import load_appworld_api_spec
-from shortchain.integrations.halo import load_appworld_traces, reconstruct_catalog
+from shortchain.adapters.appworld_api import load_appworld_api_spec
+from shortchain.adapters.halo import load_appworld_traces, reconstruct_catalog
 from shortchain.utils.logging import get_logger
 
 log = get_logger(__name__)

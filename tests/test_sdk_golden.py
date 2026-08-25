@@ -13,7 +13,7 @@ pytest.importorskip("opentelemetry")
 
 from opentelemetry import trace
 
-from shortchain.runtime import task_span as ts
+from shortchain.telemetry import task_span as ts
 from shortchain.sdk import ShortChain
 
 ROOT = "shortchain.task"

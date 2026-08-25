@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from shortchain.ingest.otel import OtelSpan, OtelTrace
-from shortchain.runtime.catalog import (
+from shortchain.telemetry.catalog import (
     build_catalog,
     load_catalog_file,
     merge_catalog,

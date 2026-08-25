@@ -264,7 +264,7 @@ for train_fold, val_fold in splitter.kfold_split(df):
 ### `ShortChainClassifier`
 
 ```python
-from shortchain.head.classifier import ShortChainClassifier
+from shortchain.model.classifier import ShortChainClassifier
 from shortchain.config import ClassifierConfig
 
 clf = ShortChainClassifier(ClassifierConfig(model_type="xgboost"))
@@ -287,7 +287,7 @@ clf = ShortChainClassifier.load("models/shortchain.pkl")  # Supports v1 and v2
 ### `InferenceEngine`
 
 ```python
-from shortchain.head.inference import InferenceEngine
+from shortchain.model.inference import InferenceEngine
 
 # Load from disk
 engine = InferenceEngine(model_path="models/shortchain.pkl", top_k=5)
@@ -323,7 +323,7 @@ results = engine.predict_batch(test_df, top_k=5)
 ### `Trainer`
 
 ```python
-from shortchain.head.trainer import Trainer
+from shortchain.model.trainer import Trainer
 
 trainer = Trainer(
     classifier_config=ClassifierConfig(),

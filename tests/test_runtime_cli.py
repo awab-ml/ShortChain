@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from shortchain.runtime.cli import (
+from shortchain.telemetry.cli import (
     _validate_env_workers,
     _warn_if_workers_gt_1,
 )

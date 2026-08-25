@@ -34,7 +34,7 @@ from starlette.responses import JSONResponse, Response
 
 from shortchain.config import RuntimeConfig
 from shortchain.ingest.otel import OtelSpan
-from shortchain.runtime.assembler import TraceAssembler
+from shortchain.telemetry.assembler import TraceAssembler
 from shortchain.utils.logging import get_logger
 
 log = get_logger(__name__)

@@ -11,7 +11,7 @@ import pytest
 
 from shortchain.config import ClassifierConfig
 from shortchain.dataset.builder import build_dataset
-from shortchain.head.classifier import ShortChainClassifier
+from shortchain.model.classifier import ShortChainClassifier
 from shortchain.ingest.schema import Span, Trajectory
 
 
