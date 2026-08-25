@@ -1,7 +1,6 @@
-"""Association properties context + span injection (PR 6).
+"""Association properties context + span injection.
 
-Implements the merge-not-replace association contract from ``ingest-fix-plan``
-(K7 / K13):
+Implements the merge-not-replace association contract:
 
 - ``association_values()`` — the merged association dict held in a
   ``ContextVar``.

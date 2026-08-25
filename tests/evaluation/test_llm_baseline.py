@@ -6,7 +6,7 @@ import importlib.util
 from pathlib import Path
 
 
-_ROOT = Path(__file__).resolve().parent.parent
+_ROOT = Path(__file__).resolve().parent.parent.parent
 _spec = importlib.util.spec_from_file_location(
     "run_llm_baseline", _ROOT / "scripts" / "run_llm_baseline.py"
 )

@@ -8,7 +8,7 @@ share the same logic.
 
 from __future__ import annotations
 
-from shortchain.ingest.schema import Span, Trajectory
+from shortchain.ingest.schema import Trajectory
 from shortchain.utils.logging import get_logger
 
 log = get_logger(__name__)
@@ -33,9 +33,9 @@ def expand_to_span_trajectories(trajectory: Trajectory) -> list[Trajectory]:
     - ``available_tools``: the original trajectory's full ``tools_used`` set
     - ``previous_tools``: tools used in spans *before* the target span
 
-    This is the core "span-level" expansion described in the ShortChain
-    paper for multi-span evaluation.  It is not ToolBench-specific — any
-    benchmark with sequential tool calls can benefit from it.
+    This is the core "span-level" expansion for multi-span evaluation. It is
+    not benchmark-specific — any workload with sequential tool calls can
+    benefit from it.
 
     Parameters
     ----------

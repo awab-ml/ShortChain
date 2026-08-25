@@ -1,4 +1,4 @@
-"""Public SDK façade (K15).
+"""Public SDK façade.
 
 Provides the documented import path ``from shortchain.sdk import ShortChain``
 without making ``shortchain.telemetry`` the user-facing name.

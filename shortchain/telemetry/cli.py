@@ -1,4 +1,4 @@
-"""CLI for the ShortChain runtime (PR 4).
+"""CLI for the ShortChain telemetry receiver.
 
     python -m shortchain.telemetry receive [--config configs/runtime.yaml]
 

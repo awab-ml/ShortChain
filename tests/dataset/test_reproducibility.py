@@ -7,7 +7,6 @@ and the resulting feature digests must match.
 
 from __future__ import annotations
 
-import hashlib
 import os
 import subprocess
 import sys
@@ -59,7 +58,7 @@ print(hashlib.sha256(mat.encode()).hexdigest())
 
 @pytest.mark.parametrize("seed_a,seed_b", [("1", "2"), ("7", "12345")])
 def test_dataset_build_is_hash_seed_stable(seed_a: str, seed_b: str):
-    root = Path(__file__).resolve().parent.parent
+    root = Path(__file__).resolve().parent.parent.parent
     env_a = dict(os.environ, PYTHONHASHSEED=seed_a)
     env_b = dict(os.environ, PYTHONHASHSEED=seed_b)
     code = _build_script()

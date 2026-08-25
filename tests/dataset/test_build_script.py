@@ -68,7 +68,7 @@ def write_runtime_trajectories(path: Path) -> Path:
 def run_script(trajectories: Path, *extra: str, tmp: Path) -> subprocess.CompletedProcess:
     cmd = [
         sys.executable,
-        str(Path(__file__).parent.parent / "scripts" / "build_dataset.py"),
+        str(Path(__file__).resolve().parent.parent.parent / "scripts" / "build_dataset.py"),
         "--trajectories",
         str(trajectories),
         "--output",

@@ -13,7 +13,7 @@ from shortchain.ingest.otel import (
     OtelTrajectoryLoader,
 )
 
-FIXTURES = Path(__file__).parent / "fixtures" / "otel"
+FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "otel"
 
 
 def load_trace(name: str) -> OtelTrace:

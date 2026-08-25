@@ -44,7 +44,7 @@ class TestOpenEnd:
         assert root.attributes["shortchain.task_id"] == "t1"
         assert root.attributes["traceloop.span.kind"] == "workflow"
         assert root.attributes["shortchain.complete"] is True
-        # K13 golden: one trace_id; the child is parented under the root.
+        # golden: one trace_id; the child is parented under the root.
         assert root.context.trace_id == child_.context.trace_id
         assert child_.parent.span_id == root.context.span_id
 

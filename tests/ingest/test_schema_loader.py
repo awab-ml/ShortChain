@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import json
-import tempfile
 from pathlib import Path
 
 import pytest
 
 from shortchain.ingest.schema import Span, Trajectory
-from shortchain.ingest.loader import JSONLTrajectoryLoader, load_trajectories
+from shortchain.ingest.loader import load_trajectories
 from shortchain.config import IngestConfig
 
 
@@ -185,7 +184,9 @@ class TestJSONLLoader:
 
     def test_load_example_data(self):
         """Integration test: load the shipped example trajectories."""
-        example_path = Path(__file__).parent.parent / "data" / "example"
+        example_path = (
+            Path(__file__).resolve().parent.parent.parent / "examples" / "traces"
+        )
         if not example_path.exists():
             pytest.skip("Example data not found")
         trajs = load_trajectories(example_path)

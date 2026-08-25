@@ -5,13 +5,13 @@ unify training, inference, candidate tool shortlisting, and serialization across
 multiple model backends (e.g., XGBoost, Random Forest, Logistic Regression).
 
 Architecture Overview:
-----------------------
-- **Phase 1 (Legacy)**: Inline feature vectorization using individual TF-IDF vectorizers
+---------------------
+- **v1 (Legacy)**: Inline feature vectorization using individual TF-IDF vectorizers
   and LabelEncoders persisted inside the classifier instance.
-- **Phase 2 (Current)**: Standardized feature encoding delegated entirely to the
+- **v2 (Current)**: Standardized feature encoding delegated entirely to the
   ``FeaturePipeline`` module.
 - **Backward Compatibility**: Automated fallback detection during model deserialization
-  (`ShortChainClassifier.load`) allowing seamless inference on Phase 1 legacy models.
+  (`ShortChainClassifier.load`) allowing seamless inference on v1 legacy models.
 
 Learning & inference contract
 -----------------------------
@@ -32,7 +32,6 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from scipy.sparse import hstack as sp_hstack, issparse
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import LabelEncoder
 
@@ -118,7 +117,7 @@ class ShortChainClassifier:
         # Step 1: Instantiate model estimator based on active configuration
         self.model = self._create_model()
 
-        # Step 2: Initialize and fit the Phase 2 FeaturePipeline
+        # Step 2: Initialize and fit the v2 FeaturePipeline
         self.pipeline = FeaturePipeline(
             config=self.features_config or FeaturesConfig()
         )
@@ -268,7 +267,7 @@ class ShortChainClassifier:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Build state payload including Phase 2 metadata format version 2
+        # Build state payload including v2 metadata format version 2
         state = {
             "model": self.model,
             "config": self.config.model_dump(),
@@ -276,7 +275,7 @@ class ShortChainClassifier:
                 self.features_config.model_dump() if self.features_config else None
             ),
             "pipeline": self.pipeline,
-            "version": 2,  # Phase 2 format marker
+            "version": 2,  # v2 format marker
         }
         with open(path, "wb") as f:
             pickle.dump(state, f)
@@ -287,8 +286,8 @@ class ShortChainClassifier:
     def load(cls, path: str | Path) -> "ShortChainClassifier":
         """Load a persisted classifier artifact from disk.
 
-        Automatically inspects version metadata to support both Phase 2 (pipeline-based)
-        and Phase 1 (legacy inline vectorizer) format structures.
+        Automatically inspects version metadata to support both v2 (pipeline-based)
+        and v1 (legacy inline vectorizer) format structures.
 
         Parameters
         ----------
@@ -307,7 +306,7 @@ class ShortChainClassifier:
         version = state.get("version", 1)
 
         if version >= 2:
-            # Reconstruct Phase 2 instance with FeaturePipeline state
+            # Reconstruct v2 instance with FeaturePipeline state
             features_config = (
                 FeaturesConfig.model_validate(state["features_config"])
                 if state.get("features_config")
@@ -320,7 +319,7 @@ class ShortChainClassifier:
             obj._use_legacy = False
             log.info(f"Model loaded from {path} (v2 format)")
         else:
-            # Reconstruct Phase 1 legacy instance with backward-compatibility adapter
+            # Reconstruct v1 legacy instance with backward-compatibility adapter
             obj = cls(config=config)
             obj.model = state["model"]
             obj._legacy_tfidf = state.get("tfidf_vectorizers", {})
@@ -364,13 +363,13 @@ class ShortChainClassifier:
     # Legacy compatibility adapter
     # ------------------------------------------------------------------
 
-    # Schema definition for Phase 1 legacy feature transformation
+    # Schema definition for v1 legacy feature transformation
     _LEGACY_TEXT = ["intent", "previous_tools", "last_thought", "tool_name", "tool_description"]
     _LEGACY_NUM = ["n_spans"]
     _LEGACY_CAT = ["app_name"]
 
     def _legacy_transform(self, X: pd.DataFrame) -> np.ndarray:
-        """Transform raw input using saved Phase 1 inline transformers.
+        """Transform raw input using saved v1 inline transformers.
 
         Parameters
         ----------

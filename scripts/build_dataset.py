@@ -4,9 +4,9 @@
 Usage::
 
     python scripts/build_dataset.py \\
-        --trajectories data/example/ \\
-        --output data/datasets/ \\
-        --config configs/example.yaml
+        --trajectories examples/traces/ \\
+        --output /tmp/sc-ds \\
+        --config examples/configs/example.yaml
 
 Runtime (OTEL) data::
 

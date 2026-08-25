@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-_ROOT = Path(__file__).resolve().parent.parent
+_ROOT = Path(__file__).resolve().parent.parent.parent
 _spec = importlib.util.spec_from_file_location(
     "run_validation_mod", _ROOT / "scripts" / "run_validation.py"
 )

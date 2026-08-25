@@ -177,7 +177,7 @@ class TestHappyPath:
 
 
 # ---------------------------------------------------------------------------
-# Projector-side quality gates (full quality module lands in PR 3)
+# Projector-side quality gates (full quality module lives in ingest/quality)
 # ---------------------------------------------------------------------------
 
 

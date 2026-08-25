@@ -1,6 +1,6 @@
 """Golden tests for ShortChain.set_task / set_success (Section 6.2).
 
-The load-bearing contract (K13): a post-run ``set_success`` must write onto
+The load-bearing contract: a post-run ``set_success`` must write onto
 the STILL-OPEN SDK root (same trace_id as the tool spans) and then end it —
 never start a new span.
 """
@@ -40,7 +40,7 @@ class TestGoldenContract:
         root = [s for s in finished(memory) if s.name == "shortchain.task"][0]
         tool = [s for s in finished(memory) if s.name == "execute_tool lookup_order"][0]
 
-        # K13 golden: ONE trace_id; the root still carries success after the
+        # golden: ONE trace_id; the root still carries success after the
         # child already ended; the child is a child of the root.
         assert root.context.trace_id == tool.context.trace_id
         assert tool.parent.span_id == root.context.span_id

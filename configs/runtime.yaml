@@ -1,5 +1,5 @@
-# Runtime collection configuration — thin OTLP receiver (PR 4)
-# =============================================================
+# Runtime collection configuration — thin OTLP receiver
+# =====================================================
 #   python -m shortchain.telemetry receive --config configs/runtime.yaml
 #
 # data/runtime/trajectories.jsonl is SECRET MATERIAL (prompts, tool args,

@@ -1,4 +1,4 @@
-"""Tests for negative sampling strategies (Phase 2)."""
+"""Tests for negative sampling strategies."""
 
 from __future__ import annotations
 

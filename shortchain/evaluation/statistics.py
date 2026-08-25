@@ -1,6 +1,6 @@
 """Resampling-based statistics for ShortChain benchmark results.
 
-Mirrors the TabAgent (Levy et al. 2026) evaluation protocol:
+The evaluation protocol:
 
 - Metrics are computed per task, then macro-averaged.
 - 95% confidence intervals are obtained via **paired bootstrap** resampling

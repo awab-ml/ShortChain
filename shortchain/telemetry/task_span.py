@@ -1,4 +1,4 @@
-"""SDK-owned ``shortchain.task`` root span lifecycle (K13).
+"""SDK-owned ``shortchain.task`` root span lifecycle.
 
 Why a root span at all: OpenLLMetry instrumentors end their workflow/agent/
 tool spans *before* ``agent.run()`` returns, so a post-run ``set_success``

@@ -1,14 +1,14 @@
-"""ShortChain SDK — production collection entry point (PR 5).
+"""ShortChain SDK — production collection entry point.
 
 ``ShortChain.init`` sets up our own ``TracerProvider`` (see
 ``shortchain/telemetry/instrument.py``), enables installed OpenLLMetry
 instrumentations, and exports OTLP to the training receiver. The API is
-ours (K5): we never wrap ``Traceloop.init`` — no Traceloop branding, no
+ours: we never wrap ``Traceloop.init`` — no Traceloop branding, no
 default ``api.traceloop.com``, no hard dependency on every instrumentation.
 
-PR 6 adds the load-bearing task-root span (``set_task`` / ``end_task`` /
-``set_success``) so traces carry the success signal on the same
-``trace_id``. Until then ``init`` alone is enough to *collect* OTEL spans.
+The task-root span (``set_task`` / ``end_task`` / ``set_success``) makes
+traces carry the success signal on the same ``trace_id``. ``init`` alone is
+enough to *collect* OTEL spans.
 
 Env vars (SDK-owned):
 - ``SHORTCHAIN_API_KEY``, ``SHORTCHAIN_ENDPOINT`` (``file://`` allowed),
@@ -57,7 +57,7 @@ class ShortChain:
         block_instruments: set[str] | None = None,
         resource_attributes: dict | None = None,
         headers: dict[str, str] | None = None,
-        content_tracing: bool = True,          # default ON (K12)
+        content_tracing: bool = True,          # default ON
         span_postprocess: Callable[[ReadableSpan], None] | None = None,
     ) -> None:
         """Enable OpenLLMetry instrumentations and export OTLP traces.
@@ -73,7 +73,7 @@ class ShortChain:
             OTLP endpoint base; ``/v1/traces`` appended if missing.
             ``file://path`` enables a local JSONL span dump (dev only).
         display_endpoint
-            Optional second exporter for a display backend (K8 hook).
+            Optional second exporter for a display backend.
         enabled
             Kill switch (env ``SHORTCHAIN_TRACING_ENABLED``).
         instruments
@@ -82,7 +82,7 @@ class ShortChain:
             Blacklist; always wins over ``instruments``.
         content_tracing
             Send prompts / tool calls (needed for intent+observation);
-            also mirrors ``TRACELOOP_TRACE_CONTENT`` (K12).
+            also mirrors ``TRACELOOP_TRACE_CONTENT``.
         span_postprocess
             Called on each ended span (redaction hook; may mutate
             attributes — safe to ship now, implement later).
@@ -107,7 +107,7 @@ class ShortChain:
             app_name=app_name,
             resource_attributes=resource_attributes,
         )
-        # K13: association injected onto every future child span.
+        # association injected onto every future child span.
         provider.add_span_processor(AssociationInjectionSpanProcessor())
         n_exporters = len(
             attach_exporters(
@@ -135,7 +135,7 @@ class ShortChain:
         atexit.register(ShortChain.flush)
 
     # ------------------------------------------------------------------
-    # Task-root span (K13) — production training quality requires these
+    # Task-root span — production training quality requires these
     # ------------------------------------------------------------------
 
     @staticmethod

@@ -261,7 +261,7 @@ class TestGroupStratifiedSplitter:
 
 class TestSpanLevelNoLookahead:
     """State-aware (per-decision) context must NEVER see the current or future
-    step — this is the P1 anti-leakage contract."""
+    step — this is the no-lookahead / no-task-leakage contract."""
 
     @pytest.fixture
     def stateful_traj(self) -> Trajectory:

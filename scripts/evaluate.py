@@ -4,8 +4,8 @@
 Usage::
 
     python scripts/evaluate.py \\
-        --model models/shortchain.pkl \\
-        --dataset data/datasets/test.csv
+        --model /tmp/sc-model.pkl \\
+        --dataset /tmp/sc-ds/test.csv
 
 Concept
 -------

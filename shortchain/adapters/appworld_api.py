@@ -51,7 +51,7 @@ class ToolSpec:
         return len(self.parameters)
 
     def candidate_text(self) -> str:
-        """P3 candidate representation: name + description + argument hints."""
+        """Candidate representation: name + description + argument hints."""
         args = "; ".join(
             f"{p.name} ({p.type}){': ' + p.description if p.description else ''}"
             for p in self.parameters
@@ -123,9 +123,9 @@ def build_catalog_and_schemas(
 ) -> tuple[dict[str, str], dict[str, ToolSpec]]:
     """Build ``(catalog, schemas)`` for the given tool names.
 
-    ``catalog[tool]`` is the P3 candidate text (used as ``tool_description``
+    ``catalog[tool]`` is the candidate text (used as ``tool_description``
     in training/eval and as the BM25/DSR document); ``schemas[tool]`` is the
-    full typed spec used for P2 schema features. Tools without an AppWorld
+    full typed spec used for schema features. Tools without an AppWorld
     spec keep an empty description and are omitted from ``schemas``.
     """
     names = set(tool_names)

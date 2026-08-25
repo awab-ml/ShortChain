@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""ShortChain P0 validation on AppWorld (HALO Gemini traces).
+"""ShortChain validation on AppWorld (HALO Gemini traces).
 
-Protocol (paper-aligned, leakage-free):
+Protocol (leakage-free):
 - Task-level N-fold split (GroupKFold by task_id).
 - Train one ShortChain classifier per fold on the fold-train trajectories;
   CorpusStats are frozen on the TRAIN set and reused for evaluation rows
@@ -24,9 +24,9 @@ Techniques worth knowing
 - Dense (E5) baselines load torch; XGBoost loads libomp — together they can
   segfault on duplicate OpenMP runtimes, so the harness pins
   ``KMP_DUPLICATE_LIB_OK`` and ``OMP_NUM_THREADS`` before either loads.
-- ``--calibrate``/``--hybrid`` add the P4 analysis: cross-fold, group-aware
-  calibration (ECE) and selective / LLM-fallback metrics driven by a cached,
-  cost-bound LLM baseline (see ``run_llm_baseline.py``).
+- ``--calibrate``/``--hybrid`` add the calibration analysis: cross-fold,
+  group-aware calibration (ECE) and selective / LLM-fallback metrics driven
+  by a cached, cost-bound LLM baseline (see ``run_llm_baseline.py``).
 """
 
 from __future__ import annotations
@@ -373,7 +373,7 @@ def _run_span_seed(
 
     Trains two models per fold: ``model_state`` (context includes state before
     the decision; ``span_index=k``) and ``model_nostate`` (context is
-    trajectory-level, ``span_index=None``) as the paper-style ablation.
+    trajectory-level, ``span_index=None``) as a state-ablation contrast.
     Evaluates every decision of the test tasks at its true state, plus
     baselines (random / popularity / BM25 / repeat_prev) on identical rows.
     """
@@ -712,9 +712,9 @@ def _run_calibration_analysis(
     return report
 
 
-def _print_p4(r: dict) -> None:
+def _print_calibration(r: dict) -> None:
     print("\n" + "=" * 74)
-    print("  P4 — CALIBRATION & SELECTIVE / LLM-FALLBACK HYBRID (task level)")
+    print("  CALIBRATION & SELECTIVE / LLM-FALLBACK HYBRID (task level)")
     print("=" * 74)
     print(f"  decision                     : {r.get('decision','P@R==1')} (full-shortlist correctness)")
     print(f"  calibration                 : {r['calibration_method']} (fit on {r['n_oof_points']} OOF points)")
@@ -768,7 +768,7 @@ def _span_step_bucket_r1(dec_scores: dict) -> dict:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run ShortChain P0 AppWorld validation.")
+    parser = argparse.ArgumentParser(description="Run ShortChain AppWorld validation.")
     parser.add_argument("--config", type=str, default=None, help="Path to validation.yaml.")
     parser.add_argument("--traces", type=str, default=None, help="Overrides data.traces_path.")
     parser.add_argument("--output-dir", type=str, default=None, help="Overrides output_dir.")
@@ -823,7 +823,7 @@ def main() -> None:
         log.info(f"AppWorld API spec: {spec_coverage['tools_with_specs']}/{spec_coverage['tools_total']} tools resolved")
     log.info(f"Loaded {len(traces)} tasks, catalog={len(catalog)} tools")
 
-    # 2. Multi-seed grouped CV (per-seed task scores averaged, paper-style)
+    # 2. Multi-seed grouped CV (per-seed task scores averaged)
     n_seeds = int(args.seeds if args.seeds is not None else cfg.get("seeds", 1))
     level = (args.level or cfg.get("level", "task")).lower()
     if level not in ("task", "span"):
@@ -878,7 +878,7 @@ def main() -> None:
 
     # 5. Aggregate + significance
     report: dict = {
-        "protocol": "p0_appworld_halo",
+        "protocol": "appworld_halo",
         "level": level,
         "primary_method": primary,
         "n_tasks": len(tasks),
@@ -1011,7 +1011,7 @@ def main() -> None:
         report["p4_calibration_hybrid"] = cal_report
         with open(results_file, "w") as f:
             json.dump(report, f, indent=2, default=float)
-        _print_p4(cal_report)
+        _print_calibration(cal_report)
     elif (args.calibrate or args.hybrid) and level != "task":
         log.warning("--calibrate/--hybrid apply to task-level only; skipped for level=%s", level)
 
@@ -1023,7 +1023,7 @@ def _print_report(report: dict) -> None:
     primary = report.get("primary_method", "model")
     level = report.get("level", "task")
     print("\n" + "=" * 74)
-    print(f"  SHORTCHAIN P0 — APPWORLD ({level}-level, n={report['n_tasks']} tasks, "
+    print(f"  SHORTCHAIN — APPWORLD ({level}-level, n={report['n_tasks']} tasks, "
           f"catalog={report['catalog_size']})")
     print("=" * 74)
     for pool_name, pool_block in report["results"].items():

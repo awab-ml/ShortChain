@@ -97,7 +97,7 @@ class TestSdkFacade:
         assert SC is ShortChain
 
     def test_no_traceloop_import(self):
-        """K6: the SDK must not depend on traceloop-sdk at import time."""
+        """The SDK must not depend on traceloop-sdk at import time."""
         import shortchain.sdk  # noqa: F401
 
         assert "traceloop" not in sys.modules

@@ -1,4 +1,4 @@
-"""Thin in-repo OTLP/HTTP receiver (PR 4).
+"""Thin in-repo OTLP/HTTP receiver.
 
 Accepts what the SDK sends (OTLP/HTTP protobuf; OTLP JSON for fixtures /
 curl), decodes into :class:`OtelSpan`, feeds the :class:`TraceAssembler`,

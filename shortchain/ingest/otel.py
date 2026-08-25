@@ -1104,7 +1104,7 @@ class OtelTraceProjector:
 
     Server-side (receiver / offline loader); clients never run this. The
     projector never emits a trajectory without ``success`` and
-    ``metadata.success_source`` even when the trace has none (K7).
+    ``metadata.success_source`` even when the trace has none.
     """
 
     def __init__(self, config: ProjectionConfig | None = None) -> None:

@@ -4,10 +4,10 @@
 Usage::
 
     python scripts/train.py \\
-        --dataset data/datasets/ \\
+        --dataset /tmp/sc-ds \\
         --model xgboost \\
         --folds 5 \\
-        --output models/shortchain.pkl
+        --output /tmp/sc-model.pkl
 
 Concept
 -------
@@ -105,7 +105,7 @@ def main() -> None:
     log.info("[bold]Training final model on all data...[/bold]")
     output_path = Path(args.output)
     ensure_dir(output_path.parent)
-    clf = trainer.train_final(train_df, save_path=output_path)
+    trainer.train_final(train_df, save_path=output_path)
 
     # Save CV results
     results_path = output_path.parent / "cv_results.json"

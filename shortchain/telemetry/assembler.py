@@ -1,4 +1,4 @@
-"""Trace assembly for the OTLP receiver (PR 4).
+"""Trace assembly for the OTLP receiver.
 
 Groups raw OTLP spans by ``trace_id``, waits for a completion signal
 (SDK ``shortchain.task`` root ended + settle time, idle timeout, or
@@ -12,7 +12,7 @@ Bounds (enforced while buffering, not only after projection):
   answers HTTP 200 + OTLP ``partial_success`` (never 429).
 - ``max_spans_in``: per-trace cap on NON-PROTECTED spans; the SDK root
   (``shortchain.task`` / ``shortchain.task_root=true``) is never dropped
-  and may evict skip/other/extra-LLM spans to stay near the cap (K13).
+  and may evict skip/other/extra-LLM spans to stay near the cap.
 - ``seen_trace_ids`` LRU: dedup after flush; late spans are counted and
   dropped (never rewrite JSONL).
 
@@ -56,7 +56,7 @@ FLUSH_REASON_METRIC = {
 
 
 def _is_protected(span: OtelSpan) -> bool:
-    """SDK root spans are never dropped by the assembler (K13)."""
+    """SDK root spans are never dropped by the assembler."""
     return span.name == "shortchain.task" or bool(
         _first_attr(span.attributes, "shortchain.task_root")
     )

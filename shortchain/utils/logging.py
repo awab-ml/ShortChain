@@ -6,7 +6,6 @@ Provides a pre-configured Rich-based logger that all modules import.
 from __future__ import annotations
 
 import logging
-import sys
 
 from rich.logging import RichHandler
 

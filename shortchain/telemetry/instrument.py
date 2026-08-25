@@ -1,4 +1,4 @@
-"""Own ``TracerProvider`` + OpenLLMetry instrumentor enablement (PR 5).
+"""Own ``TracerProvider`` + OpenLLMetry instrumentor enablement.
 
 Mirrors the *useful* parts of ``traceloop/sdk/tracing/tracing.py`` without
 the Traceloop client: own Resource, own exporter (OTLP HTTP, optional
@@ -6,7 +6,7 @@ second display exporter, or ``file://`` JSONL dump), always
 ``ThreadingInstrumentor``, and per-instrumentor construction so a missing
 framework / constructor change cannot abort ``ShortChain.init``.
 
-Why not ``Traceloop.init`` (K6): it defaults to ``https://api.traceloop.com``,
+Why not ``Traceloop.init``: it defaults to ``https://api.traceloop.com``,
 prints Traceloop branding, optionally starts a Fetcher, and hard-depends on
 every instrumentation package. We keep the public surface ours.
 """
@@ -65,7 +65,7 @@ _BLOCKED_BY_DEFAULT = {"requests", "urllib3", "redis", "fastapi", "flask", "djan
 class FileSpanExporter(SpanExporter):
     """``file://`` dev dump: one JSON line per ended span (OTelSpan shape).
 
-    NOT the production path (K16) — no dual-export, no quality gating
+    NOT the production path — no dual-export, no quality gating
     server-side. Assemble these lines offline with ``OtelTrajectoryLoader``.
     """
 

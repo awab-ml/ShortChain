@@ -1,4 +1,4 @@
-"""Tests for the Phase 2 features module.
+"""Tests for the v2 features module.
 
 Covers: CorpusStats, ContextFeatureBuilder, ToolFeatureBuilder,
 TfidfEncoder, DenseEncoder (fallback), and FeaturePipeline.
@@ -370,7 +370,7 @@ class TestFeaturePipeline(unittest.TestCase):
             pipe.fit_transform("not a dataframe")
 
     def test_with_extra_numeric_columns(self):
-        """Pipeline should handle Phase 2 numeric columns gracefully."""
+        """Pipeline should handle extra numeric columns gracefully."""
         pipe = FeaturePipeline()
         df = self._sample_df()
         df["span_index"] = [2, 1]
@@ -392,7 +392,7 @@ if __name__ == "__main__":
 
 
 class TestToolSchemaFeatures:
-    """P2: static per-tool schema features must be emitted deterministically and
+    """Static per-tool schema features must be emitted deterministically and
     must NOT appear when no specs are provided (backward compatibility)."""
 
     def _specs(self):
