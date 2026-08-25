@@ -1,181 +1,141 @@
 # ShortChain
 
-> Replace expensive LLM decision components in agentic systems with compact tabular-textual classifiers.
+An observability backend for LLM applications that learns and adapts.
 
-**ShortChain** is an optimization layer that learns from successful agent execution traces to train lightweight classifiers (~1ms inference) that replace or augment expensive LLM tool-selection decisions.
+ShortChain sits on [OpenTelemetry](https://opentelemetry.io/) / [OpenLLMetry](https://github.com/OpenLLMetry/opentelemetry-openllmetry): it collects execution traces from your agentic system, learns the execution patterns already present in them, and adapts how that system chooses tools — so you can cut operating cost and latency without replacing your agent framework.
 
-## Why ShortChain?
+It is not just a trace store. Repeated LLM tool-selection calls shrink over time.
 
-| | LLM Tool Selection | ShortChain |
-|---|---|---|
-| **Latency** | 500–2000ms per decision | ~1ms per decision |
-| **Cost** | $0.01–$0.10 per call | $0 (local inference) |
-| **Accuracy** | Baseline | Comparable (R-Precision ≥ 0.85) |
-| **Dependencies** | API key + network | NumPy + XGBoost (local) |
+## Why
 
-## Quick Start
+- **Collect** — instrument the agent with the ShortChain SDK; OpenLLMetry emits standard OTLP traces; ShortChain receives and assembles them.
+- **Learn** — successful traces become a compact classifier of *"which tool, given this context"*.
+- **Adapt** — at each decision the backend returns a ranked shortlist in ~1 ms (full replace, or hybrid with LLM fallback), so repeated LLM tool-selection calls shrink over time.
 
-```bash
-# Install
-pip install -e ".[dev]"
+## How it works
 
-# Build dataset → Train → Evaluate (3 commands, example data)
-python scripts/build_dataset.py --trajectories data/example/ --output data/datasets/
-python scripts/train.py --dataset data/datasets/ --output models/shortchain.pkl
-python scripts/evaluate.py --model models/shortchain.pkl --dataset data/datasets/test.csv
+```
+Live OTEL traces (SDK + OpenLLMetry)
+        │
+        ▼
+Telemetry receiver (OTLP/HTTP, assembler, quality gate)
+        │
+        ▼
+Canonical Trajectory / Span schema
+        │
+        ▼
+Pointwise dataset  →  features  →  compact classifier  →  ranked tool shortlist (~1ms)
+        │
+        ▼
+Optional hybrid: classifier when confident, LLM fallback when not
 ```
 
-## Production: Collect Traces From Your Agent (SDK + OTEL)
+## Quick start
 
-Dump JSONL only for benchmarks / offline data. For production, ShortChain
-enables the published OpenLLMetry instrumentations and projects live OTLP
-traces onto the training schema server-side:
+### 1. Install
+
+```bash
+pip install -e ".[dev]"          # core
+pip install -e ".[sdk,receiver]" # telemetry collection
+```
+
+### 2. Instrument with `ShortChain.init`
 
 ```python
-# pip install "shortchain[sdk,receiver]"
-import os
 from shortchain.sdk import ShortChain
 
 ShortChain.init(
-    api_key=os.environ["SHORTCHAIN_API_KEY"],
+    api_key="your-receiver-key",
     app_name="support-agent",
-    endpoint=os.environ.get("SHORTCHAIN_ENDPOINT", "http://127.0.0.1:4318"),
+    endpoint="http://127.0.0.1:4318",
 )
-
-def handle_request(req):
-    ShortChain.set_task(task_id=req.id, intent=req.text)
-    try:
-        result = agent.run(req.text)
-        ShortChain.end_task(success=bool(result.ok))
-        return result
-    except Exception:
-        ShortChain.end_task(success=False)
-        raise
 ```
 
-Run the receiver, then train on its output:
+OpenLLMetry instrumentations are enabled automatically for your existing
+LangChain / OpenAI / CrewAI / MCP code.
+
+### 3. Run the receiver
 
 ```bash
-python -m shortchain.runtime receive --config configs/runtime.yaml
-python scripts/build_dataset.py \
-    --trajectories data/runtime/trajectories.jsonl \
-    --catalog data/runtime/catalog.json \
-    --output data/datasets/runtime
-python scripts/train.py --dataset data/datasets/runtime --output models/shortchain.pkl
+shortchain receive --config configs/runtime.yaml
 ```
 
-## Use in Your Agent
+The receiver assembles live OTLP traces and writes them as projected
+trajectories under `data/runtime/` (mode `0600`).
+
+### 4. Train from collected traces
+
+```bash
+shortchain dataset --trajectories data/runtime/trajectories.jsonl \
+    --catalog data/runtime/catalog.json --output data/datasets/runtime
+shortchain train --dataset data/datasets/runtime --output models/shortchain.pkl
+```
+
+### 5. Adapt at the decision point
 
 ```python
-from shortchain.head.inference import InferenceEngine
+from shortchain.model import InferenceEngine
 
 engine = InferenceEngine(model_path="models/shortchain.pkl", top_k=5)
 
-# At each agent decision point (~1ms):
 shortlist = engine.predict(
-    context={"intent": "Send an email to John", "app_name": "gmail", ...},
-    candidates=[{"tool_name": "send_email", "tool_description": "..."}, ...],
+    context={"intent": "Refund order 9921", "app_name": "support-agent"},
+    candidates=tool_catalog,  # [{tool_name, tool_description}, ...]
+    top_k=5,
 )
-# → [("send_email", 0.94), ("create_draft", 0.72), ...]
+# [("refund_order", 0.94), ("lookup_order", 0.72), ...]  — in ~1ms
 ```
+
+## Example (offline, no agent required)
+
+The repo ships sample trajectories under `examples/traces/`:
+
+```bash
+python -m shortchain dataset --trajectories examples/traces \
+    --config examples/configs/example.yaml --output /tmp/sc-ds
+python -m shortchain train --dataset /tmp/sc-ds --output /tmp/sc-model.pkl
+python -m shortchain evaluate --model /tmp/sc-model.pkl --dataset /tmp/sc-ds/test.csv
+```
+
+See `examples/README.md` for collect / train / adapt demos.
 
 ## Architecture
 
-```
-Trajectories → Ingestion → CorpusStats → DatasetBuilder → FeaturePipeline → Classifier → Inference
-                   ↓             ↓              ↓                ↓               ↓            ↓
-             OTEL/OTLP +  Frequencies     Pointwise pairs   TF-IDF or       XGBoost/RF    Top-K tools
-             JSONL adapter Co-occurrence  (context, tool,   E5-small        with state-   ranked by
-             (runtime      App-tool maps  label) + negs     encoding        aware feats   confidence
-             receiver)
-```
-
-## Project Structure
+ShortChain is a linear pipeline of operation-named modules:
 
 ```
-ShortChain/
-├── shortchain/                    # Core package (2,920 lines)
-│   ├── config.py                # Pydantic config models (+ RuntimeConfig)
-│   ├── ingest/                  # Source adapters: JSONL, OTEL→Trajectory projector, quality gate
-│   ├── features/                # Feature pipeline (encoders, context, tool, stats)
-│   ├── dataset/                 # Dataset construction & negative sampling
-│   ├── head/                    # Classifier, trainer, inference engine
-│   ├── evaluation/              # R-precision, Recall@k, F1, AUC
-│   ├── runtime/                 # Production collection: SDK, OTLP receiver, assembler
-│   ├── sdk.py                   # Public SDK façade (from shortchain.sdk import ShortChain)
-│   └── utils/                   # I/O, logging
-├── scripts/                     # CLI entry points
-├── tests/                       # Test suite (~400 tests)
-├── configs/                     # default.yaml, runtime.yaml, example.yaml
-├── data/example/                # 15 example trajectories
-└── docs/                        # Full documentation
+shortchain/
+├── telemetry/    # SDK, instrumentors, OTLP receiver, assembler
+├── ingest/       # Trajectory / Span schema, loaders, OTEL projection
+├── features/     # context / tool / corpus-stat encoders
+├── dataset/      # pointwise (context, tool, label) construction
+├── model/        # classifier, trainer, inference engine
+├── evaluation/   # ranking metrics, calibration, hybrid fallback
+└── adapters/     # optional source / benchmark bindings
 ```
 
-## Key Features
-
-- **Agent-agnostic** — works with any agent that produces JSON execution logs
-- **Configurable field mapping** — map your log fields to ShortChain's schema via YAML
-- **Modular feature pipeline** — context, tool, and encoding stages via `FeaturePipeline`
-- **State-aware features** — span index, last action, history summary, tool diversity
-- **Pluggable negative sampling** — random, hard (same-app, co-usage, similarity), or mixed
-- **Hybrid text encoding** — TF-IDF (default) or E5-small dense embeddings
-- **Group-aware splits** — no task-level data leakage in train/test/CV
-- **Multiple backends** — XGBoost (default), Random Forest, Logistic Regression
-- **Faithful metrics** — R-precision (P@R), Recall@k
+- [docs/architecture.md](docs/architecture.md) — modules and data flow
+- [docs/concepts.md](docs/concepts.md) — traces, patterns, pointwise learning, adapt
+- [docs/integration.md](docs/integration.md) — SDK and the three adaptation modes
 
 ## Documentation
 
-| Document | Description |
-|---|---|
-| [Overview](docs/overview.md) | What ShortChain is, the problem it solves, the paper |
-| [Getting Started](docs/getting-started.md) | Installation, quick start, data format |
-| [Architecture](docs/architecture.md) | System design, data flow, module details |
-| [Configuration](docs/configuration.md) | Complete YAML reference for every setting |
-| [API Reference](docs/api-reference.md) | Python API for all public classes |
-| [Integration Guide](docs/integration.md) | How to integrate into your agent system |
-| [Development](docs/development.md) | Testing, contributing, extension patterns |
+| Doc | What it covers |
+| --- | --- |
+| [Overview](docs/overview.md) | What ShortChain is and the problem it solves |
+| [Getting Started](docs/getting-started.md) | Install, collect, train, adapt |
+| [Architecture](docs/architecture.md) | Modules, data flow, design decisions |
+| [Configuration](docs/configuration.md) | YAML reference |
+| [API Reference](docs/api-reference.md) | Public classes and functions |
+| [Integration](docs/integration.md) | SDK + replace / shortlist / hybrid modes |
+| [Concepts](docs/concepts.md) | The four core ideas in one page |
 
-## Configuration
+## Contributing
 
-Override defaults by passing a YAML config:
-
-```yaml
-classifier:
-  model_type: "random_forest"
-
-negatives:
-  strategy: "hard"
-
-dataset:
-  negative_ratio: 5
-```
-
-```bash
-python scripts/train.py --dataset data/datasets/ --config my_config.yaml
-```
-
-## Roadmap
-
-| Phase | Scope | Status |
-|---|---|---|
-| 1 — MVP | Core pipeline: ingest → train → evaluate → inference | ✅ Complete |
-| 2 — Features | Modular FeaturePipeline, negative sampling, encoders | ✅ Complete |
-| 3A — TabSchema | LLM-driven feature extraction (optional enhancement) | Planned |
-| 3B — TabSynth | Synthetic data generation for rare patterns | Planned |
-| 3C — Span-Level | Per-span decision modeling (experimental mode) | Planned |
-| 4 — Benchmarks | AppWorld adapter, real-world evaluation | Planned |
-
-## Development
-
-```bash
-pip install -e ".[dev]"
-pytest tests/ -v          # 100 tests, ~1.5 seconds
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md). Tests mirror the package layout, so
+`pytest tests/ingest/` runs the ingest suite and `pytest tests/` runs
+everything. Ruff must stay clean.
 
 ## License
 
-MIT
-
----
-
-> Inspired by the research paper *"TabAgent"* (Levy et al., 2026).
+[MIT](LICENSE). Security issues: see [SECURITY.md](SECURITY.md).

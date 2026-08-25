@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cost-bound LLM tool-selection baseline for ShortChain P4 (task-level).
+"""Cost-bound LLM tool-selection baseline for ShortChain (task-level).
 
 Runs an off-the-shelf LLM (default ``deepseek/deepseek-v4-flash-0731`` via
 OpenRouter) as a zero-shot tool shortlister on the SAME inputs a deployment
@@ -26,8 +26,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import numpy as np
 import requests
 
-from shortchain.integrations.appworld_api import load_appworld_api_spec
-from shortchain.integrations.halo import load_appworld_traces, reconstruct_catalog
+from shortchain.adapters.appworld_api import load_appworld_api_spec
+from shortchain.adapters.halo import load_appworld_traces, reconstruct_catalog
 from shortchain.utils.logging import get_logger
 
 log = get_logger(__name__)
@@ -331,7 +331,7 @@ def run_batch(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run LLM tool-selection baseline (task-level).")
-    parser.add_argument("--config", type=str, default="configs/validation.yaml")
+    parser.add_argument("--config", type=str, default="examples/benchmarks/validation.yaml")
     parser.add_argument("--model", type=str, default="deepseek/deepseek-v4-flash-0731")
     parser.add_argument("--top-k", type=int, default=9)
     parser.add_argument("--sample-size", type=int, default=0, help="0 = all tasks")

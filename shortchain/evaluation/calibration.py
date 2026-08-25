@@ -2,8 +2,8 @@
 
 The classifier's raw XGBoost scores are not guaranteed to be well calibrated
 (i.e. a score of 0.8 does not necessarily mean the prediction is correct 80%
-of the time). P4 calibrates per-decision confidence so that a confidence
-threshold becomes a meaningful, actionable "defer to LLM" rule.
+of the time). Calibration adjusts per-decision confidence so that a
+confidence threshold becomes a meaningful, actionable "defer to LLM" rule.
 
 Leak-safe usage: the calibrator must be fit only on TRAIN-task scores (e.g.
 group-aware out-of-fold scores) and applied to test-task scores. Fitting it

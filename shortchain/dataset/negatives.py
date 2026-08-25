@@ -2,7 +2,7 @@
 
 Provides pluggable strategies for selecting negative (label=0) tools:
 
-- ``RandomSampler``: uniform random from catalog \\ positives (Phase 1 default).
+- ``RandomSampler``: uniform random from catalog \\ positives (default).
 - ``HardNegativeSampler``: same-app, co-usage, and description-similar tools.
 - ``MixedSampler``: configurable mix of random + hard negatives.
 
@@ -78,7 +78,7 @@ class NegativeSampler:
 
 
 class RandomSampler(NegativeSampler):
-    """Uniform random negative sampling (Phase 1 behaviour)."""
+    """Uniform random negative sampling (baseline behaviour)."""
 
     def sample(
         self,
@@ -106,7 +106,7 @@ class HardNegativeSampler(NegativeSampler):
         Proportion from co-usage ranked tools.
     similarity_weight
         Proportion from description-similar tools (uses simple
-        token overlap for now; dense similarity in Phase 3).
+        token overlap for now; dense similarity in a later release).
     """
 
     def __init__(

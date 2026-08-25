@@ -178,7 +178,7 @@ class EvaluationConfig(BaseModel):
 
 
 class RuntimeConfig(BaseModel):
-    """OTLP HTTP receiver / trace assembler settings (PR 4)."""
+    """OTLP HTTP receiver / trace assembler settings."""
 
     bind: str = "127.0.0.1:4318"
     output: str = "data/runtime/trajectories.jsonl"

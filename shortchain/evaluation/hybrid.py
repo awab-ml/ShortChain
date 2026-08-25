@@ -1,6 +1,6 @@
 """Selective prediction & LLM-fallback (hybrid) evaluation for ShortChain.
 
-Deployment pattern (paper's "complementary deployment"):
+Deployment pattern (complementary deployment):
 - ShortChain makes the decision (its top-k shortlist) when its calibrated
   top-k confidence is high.
 - When confidence is below a threshold, the decision is *deferred* to an LLM

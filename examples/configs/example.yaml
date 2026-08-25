@@ -1,0 +1,26 @@
+# Example trajectories configuration — examples/traces/trajectories.jsonl
+# =======================================================================
+# The shipped example uses "steps" for the span list (rows contain
+# agent_name / thoughts / action / observation). Point the ingest field map
+# at it so the quick-start demo builds a real pointwise dataset:
+#
+#   python -m shortchain dataset --trajectories examples/traces \
+#       --config examples/configs/example.yaml --output /tmp/example_ds
+#   python -m shortchain train --dataset /tmp/example_ds \
+#       --output /tmp/example_ds/model.pkl
+#
+# Everything else inherits the defaults (TF-IDF text encoder, random
+# negatives), so this file only overrides the schema mapping.
+
+ingest:
+  format: "jsonl"
+  success_only: true
+  field_map:
+    task_id: "task_id"
+    intent: "intent"
+    spans: "steps"          # example logs name the step list "steps"
+    success: "success"
+    agent_name: "agent_name"
+    action: "action"
+    observation: "observation"
+    thoughts: "thoughts"

@@ -36,7 +36,7 @@ class ToolFeatureBuilder:
         features.
     tool_specs
         Optional mapping ``{tool_name: ToolSpec}`` with the tool's typed
-        argument schema (from ``shortchain.integrations.appworld_api``). When
+        argument schema (from ``shortchain.adapters.appworld_api``). When
         provided, static per-tool *schema* features (argument count, argument
         type distribution, enum presence) are added. These are deployment
         metadata constants and carry no task/test information.

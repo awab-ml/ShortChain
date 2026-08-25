@@ -5,14 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "shortchain"
 version = "0.1.0"
-description = "Replace expensive LLM decision components in agentic systems with compact tabular-textual classifiers."
+description = "An observability backend for LLM applications that learns execution patterns from OpenTelemetry traces and adapts tool selection to cut cost and latency."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [
     {name = "ShortChain Authors"},
 ]
-keywords = ["agent", "classifier", "tabular", "LLM", "optimization"]
+keywords = ["observability", "opentelemetry", "openllmetry", "llm", "agents", "tracing"]
 
 dependencies = [
     "pandas>=2.0",
@@ -59,6 +59,9 @@ dev = [
     "ruff>=0.1",
     "httpx>=0.27",
 ]
+
+[project.scripts]
+shortchain = "shortchain.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["shortchain"]

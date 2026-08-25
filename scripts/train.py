@@ -4,10 +4,10 @@
 Usage::
 
     python scripts/train.py \\
-        --dataset data/datasets/ \\
+        --dataset /tmp/sc-ds \\
         --model xgboost \\
         --folds 5 \\
-        --output models/shortchain.pkl
+        --output /tmp/sc-model.pkl
 
 Concept
 -------
@@ -26,7 +26,7 @@ from pathlib import Path
 import pandas as pd
 
 from shortchain.config import load_config
-from shortchain.head.trainer import Trainer
+from shortchain.model.trainer import Trainer
 from shortchain.utils.io import ensure_dir, write_json
 from shortchain.utils.logging import get_logger
 
@@ -105,7 +105,7 @@ def main() -> None:
     log.info("[bold]Training final model on all data...[/bold]")
     output_path = Path(args.output)
     ensure_dir(output_path.parent)
-    clf = trainer.train_final(train_df, save_path=output_path)
+    trainer.train_final(train_df, save_path=output_path)
 
     # Save CV results
     results_path = output_path.parent / "cv_results.json"
